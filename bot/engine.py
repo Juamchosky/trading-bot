@@ -9,6 +9,7 @@ from bot.execution.paper_broker import PaperBroker
 from bot.market.simulator import generate_candles
 from bot.models import BacktestTrade, Candle, SimulationResult
 from bot.strategy.sma_cross import SMACrossStrategy
+from bot.utils import export_backtest_trades_to_csv
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
@@ -131,7 +132,7 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     wins = sum(1 for pnl in closed_trade_pnls if pnl > 0)
     win_rate = (wins / len(closed_trade_pnls) * 100.0) if closed_trade_pnls else 0.0
 
-    return SimulationResult(
+    result = SimulationResult(
         initial_balance=config.initial_balance,
         final_balance=final_balance,
         return_pct=return_pct,
@@ -139,6 +140,8 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         win_rate_pct=win_rate,
         trades=backtest_trades,
     )
+    export_backtest_trades_to_csv(result.trades)
+    return result
 
 
 def _build_backtest_trade(
