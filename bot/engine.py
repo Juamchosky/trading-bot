@@ -28,7 +28,13 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     for candle in candles:
         if broker.position_qty > 0:
             stop_loss_price = broker.entry_price * (1.0 - config.stop_loss_pct)
-            if candle.close <= stop_loss_price:
+            take_profit_price = broker.entry_price * (1.0 + config.take_profit_pct)
+            if candle.close >= take_profit_price:
+                trade = broker.sell_all(candle.close)
+                if trade is not None:
+                    total_trades += 1
+                    closed_trade_pnls.append(trade.pnl)
+            elif candle.close <= stop_loss_price:
                 trade = broker.sell_all(candle.close)
                 if trade is not None:
                     total_trades += 1

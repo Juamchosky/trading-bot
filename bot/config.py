@@ -13,4 +13,5 @@ class SimulationConfig:
     short_window: int = 10
     long_window: int = 15
     stop_loss_pct: float = 0.02
+    take_profit_pct: float = 0.04
     position_size_pct: float = 0.25
