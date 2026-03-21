@@ -4,21 +4,16 @@ from bot.execution.binance_executor import (
     BinanceExecutor,
     BinanceOrderRequest,
 )
+from bot.market.binance_data import BinanceMarketDataError, fetch_historical_candles
 from bot.execution.paper_broker import PaperBroker
 from bot.market.simulator import generate_candles
-from bot.models import SimulationResult
+from bot.models import Candle, SimulationResult
 from bot.strategy.sma_cross import SMACrossStrategy
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
     binance_executor = _build_binance_executor(config)
-
-    candles = generate_candles(
-        candle_count=config.candle_count,
-        start_price=config.starting_price,
-        volatility=config.volatility,
-        seed=config.random_seed,
-    )
+    candles = _load_market_candles(config)
     strategy = SMACrossStrategy(
         short_window=config.short_window,
         long_window=config.long_window,
@@ -36,14 +31,14 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         if broker.position_qty > 0:
             stop_loss_price = broker.entry_price * (1.0 - config.stop_loss_pct)
             take_profit_price = broker.entry_price * (1.0 + config.take_profit_pct)
-            if candle.close >= take_profit_price:
-                trade = broker.sell_all(candle.close)
+            if candle.low <= stop_loss_price:
+                trade = broker.sell_all(stop_loss_price)
                 if trade is not None:
                     total_trades += 1
                     closed_trade_pnls.append(trade.pnl)
                     _maybe_send_test_order(config, binance_executor, side="SELL")
-            elif candle.close <= stop_loss_price:
-                trade = broker.sell_all(candle.close)
+            elif candle.high >= take_profit_price:
+                trade = broker.sell_all(take_profit_price)
                 if trade is not None:
                     total_trades += 1
                     closed_trade_pnls.append(trade.pnl)
@@ -84,6 +79,29 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         total_trades=total_trades,
         win_rate_pct=win_rate,
     )
+
+
+def _load_market_candles(config: SimulationConfig) -> list[Candle]:
+    if config.market_data_mode == "simulated":
+        return generate_candles(
+            candle_count=config.candle_count,
+            start_price=config.starting_price,
+            volatility=config.volatility,
+            seed=config.random_seed,
+        )
+
+    if config.market_data_mode == "binance_historical":
+        try:
+            return fetch_historical_candles(
+                symbol=config.symbol,
+                interval=config.binance_interval,
+                limit=config.candle_count,
+                base_url=config.binance_spot_base_url,
+            )
+        except BinanceMarketDataError as exc:
+            raise ValueError(f"Failed to load Binance historical candles: {exc}") from exc
+
+    raise ValueError(f"Unsupported market_data_mode: {config.market_data_mode}")
 
 
 def _build_binance_executor(config: SimulationConfig) -> BinanceExecutor | None:

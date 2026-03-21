@@ -3,8 +3,13 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Candle:
-    index: int
+    timestamp: int
+    open: float
+    high: float
+    low: float
     close: float
+    volume: float
+    index: int = 0
 
 
 @dataclass
@@ -22,4 +27,3 @@ class SimulationResult:
     return_pct: float
     total_trades: int
     win_rate_pct: float
-

@@ -3,6 +3,7 @@ from typing import Literal
 
 
 ExecutionMode = Literal["paper", "binance_testnet"]
+MarketDataMode = Literal["simulated", "binance_historical"]
 
 
 @dataclass(frozen=True)
@@ -10,10 +11,13 @@ class SimulationConfig:
     symbol: str = "BTCUSDT"
     initial_balance: float = 10_000.0
     fee_rate: float = 0.001
+    market_data_mode: MarketDataMode = "simulated"
     candle_count: int = 300
     starting_price: float = 30_000.0
     volatility: float = 0.01
     random_seed: int = 5
+    binance_spot_base_url: str = "https://api.binance.com"
+    binance_interval: str = "1h"
     short_window: int = 8
     long_window: int = 20
     stop_loss_pct: float = 0.02
