@@ -40,6 +40,9 @@ En `SimulationConfig` podes ajustar:
 - `binance_test_order_qty`: cantidad usada en test order de Binance (default `"0.001"`).
 - `binance_interval`: intervalo de velas de Binance (default `"1h"`).
 - `candle_count`: cantidad de velas para simulacion o backtest historico.
+- `volatility_filter_enabled`: habilita/deshabilita filtro de volatilidad para compras (default `False`).
+- `volatility_window`: cantidad de velas recientes usadas para volatilidad promedio (default `20`).
+- `min_volatility_pct`: volatilidad minima promedio (%) para permitir compras (default `0.30`).
 
 Comportamiento por modo:
 
@@ -56,6 +59,12 @@ Fidelidad de ejecucion en backtest:
 - señales de estrategia: se calculan con `close`.
 - stop loss: se evalua con `low` (intra-vela).
 - take profit: se evalua con `high` (intra-vela).
+
+Filtro de volatilidad (simple):
+
+- se calcula como promedio del retorno porcentual absoluto entre cierres consecutivos en las ultimas `volatility_window` velas.
+- si `volatility_filter_enabled=True` y esa volatilidad promedio es menor a `min_volatility_pct`, se bloquea la seÃ±al `buy`.
+- las seÃ±ales `sell` no se bloquean con este filtro.
 
 ## Binance Spot Testnet (seguro por defecto)
 
