@@ -89,7 +89,8 @@ def main() -> None:
             trend_slope_filter_enabled=True,
             trend_slope_lookback=3,
             stop_loss_pct=stop_loss_pct,
-            take_profit_pct=take_profit_pct,      
+            take_profit_pct=take_profit_pct,  
+            position_size_pct=0.5,    
         )
         result = run_simulation(config)
         print(
