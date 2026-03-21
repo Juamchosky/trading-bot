@@ -74,10 +74,18 @@ Controles incluidos:
 
 Imprime:
 
+- modo
 - balance inicial/final
 - retorno porcentual
 - cantidad de operaciones
 - win rate
+- closed trades
+- avg pnl
+- best trade pnl
+- worst trade pnl
+- profit factor (`inf` si corresponde)
+- avg win pnl
+- avg loss pnl
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
 
