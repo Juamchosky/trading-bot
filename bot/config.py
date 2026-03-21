@@ -20,6 +20,8 @@ class SimulationConfig:
     binance_interval: str = "1h"
     short_window: int = 8
     long_window: int = 20
+    trend_filter_enabled: bool = False
+    trend_window: int = 50
     stop_loss_pct: float = 0.02
     take_profit_pct: float = 0.05
     position_size_pct: float = 0.20

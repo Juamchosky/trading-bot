@@ -18,6 +18,8 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     strategy = SMACrossStrategy(
         short_window=config.short_window,
         long_window=config.long_window,
+        trend_filter_enabled=config.trend_filter_enabled,
+        trend_window=config.trend_window,
     )
     broker = PaperBroker(
         cash=config.initial_balance,
