@@ -81,7 +81,7 @@ def main() -> None:
             candle_count=args.candle_count,
             short_window=short_window,
             long_window=long_window,
-            trend_filter_enabled=False,
+            trend_filter_enabled=True,
             trend_window=50,
             stop_loss_pct=stop_loss_pct,
             take_profit_pct=take_profit_pct,      
