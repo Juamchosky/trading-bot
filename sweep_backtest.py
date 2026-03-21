@@ -86,6 +86,8 @@ def main() -> None:
             volatility_filter_enabled=False,
             volatility_window=20,
             min_volatility_pct=0.10,
+            trend_slope_filter_enabled=True,
+            trend_slope_lookback=3,
             stop_loss_pct=stop_loss_pct,
             take_profit_pct=take_profit_pct,      
         )
