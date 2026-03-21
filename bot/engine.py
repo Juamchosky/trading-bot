@@ -9,7 +9,11 @@ from bot.execution.paper_broker import PaperBroker
 from bot.market.simulator import generate_candles
 from bot.models import BacktestTrade, Candle, SimulationResult
 from bot.strategy.sma_cross import SMACrossStrategy
-from bot.utils import export_backtest_summary_to_csv, export_backtest_trades_to_csv
+from bot.utils import (
+    export_backtest_summary_to_csv,
+    export_backtest_trades_to_csv,
+    export_equity_curve_to_csv,
+)
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
@@ -34,8 +38,11 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     closes: list[float] = []
     closed_trade_pnls: list[float] = []
     backtest_trades: list[BacktestTrade] = []
+    equity_curve: list[tuple[int, float]] = []
     total_trades = 0
     open_position_entry_timestamp: int | None = None
+    equity_peak: float | None = None
+    max_drawdown_pct = 0.0
 
     for candle in candles:
         if broker.position_qty > 0:
@@ -111,6 +118,14 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
                 open_position_entry_timestamp = None
                 _maybe_send_test_order(config, binance_executor, side="SELL")
 
+        current_equity = broker.equity(candle.close)
+        equity_curve.append((candle.timestamp, current_equity))
+        equity_peak, max_drawdown_pct = _update_drawdown_metrics(
+            equity=current_equity,
+            equity_peak=equity_peak,
+            max_drawdown_pct=max_drawdown_pct,
+        )
+
     last_price = candles[-1].close
     if broker.position_qty > 0:
         # Force close for final accounting.
@@ -135,6 +150,19 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
             _maybe_send_test_order(config, binance_executor, side="SELL")
 
     final_balance = broker.equity(last_price)
+    if candles:
+        final_timestamp = candles[-1].timestamp
+        if not equity_curve or equity_curve[-1][0] != final_timestamp:
+            equity_curve.append((final_timestamp, final_balance))
+        else:
+            equity_curve[-1] = (final_timestamp, final_balance)
+
+        equity_peak, max_drawdown_pct = _update_drawdown_metrics(
+            equity=final_balance,
+            equity_peak=equity_peak,
+            max_drawdown_pct=max_drawdown_pct,
+        )
+
     return_pct = ((final_balance / config.initial_balance) - 1.0) * 100.0
     metrics = _calculate_closed_trade_metrics(closed_trade_pnls)
 
@@ -152,10 +180,31 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         avg_win_pnl=metrics["avg_win_pnl"],
         avg_loss_pnl=metrics["avg_loss_pnl"],
         trades=backtest_trades,
+        max_drawdown_pct=max_drawdown_pct,
+        equity_curve=equity_curve,
     )
     export_backtest_trades_to_csv(result.trades)
     export_backtest_summary_to_csv(config, result)
+    export_equity_curve_to_csv(result.equity_curve)
     return result
+
+
+def _update_drawdown_metrics(
+    *,
+    equity: float,
+    equity_peak: float | None,
+    max_drawdown_pct: float,
+) -> tuple[float, float]:
+    if equity_peak is None or equity > equity_peak:
+        return equity, max_drawdown_pct
+
+    if equity_peak <= 0:
+        return equity_peak, max_drawdown_pct
+
+    drawdown_pct = ((equity_peak - equity) / equity_peak) * 100.0
+    if drawdown_pct > max_drawdown_pct:
+        return equity_peak, drawdown_pct
+    return equity_peak, max_drawdown_pct
 
 
 def _calculate_closed_trade_metrics(closed_trade_pnls: list[float]) -> dict[str, float | int]:

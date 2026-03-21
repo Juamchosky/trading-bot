@@ -121,7 +121,8 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
 
@@ -143,5 +144,6 @@ Tambien incluye metricas agregadas basadas en trades cerrados:
 - `profit_factor`: `gross_profit / abs(gross_loss)`; si no hay perdidas, devuelve `inf` (o `0.0` si tampoco hay ganancias).
 - `avg_win_pnl`: promedio de PnL de trades ganadores.
 - `avg_loss_pnl`: promedio de PnL de trades perdedores.
+- `max_drawdown_pct`: peor drawdown porcentual observado durante la corrida.
 
 Si no hay trades cerrados, estas metricas devuelven `0` para evitar divisiones por cero.

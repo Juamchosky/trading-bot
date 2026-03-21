@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -47,3 +47,5 @@ class SimulationResult:
     avg_win_pnl: float
     avg_loss_pnl: float
     trades: list[BacktestTrade]
+    max_drawdown_pct: float = 0.0
+    equity_curve: list[tuple[int, float]] = field(default_factory=list)

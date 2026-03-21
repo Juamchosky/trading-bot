@@ -10,6 +10,7 @@ from bot.models import SimulationResult
 
 BACKTEST_TRADES_CSV_FILENAME = "backtest_trades.csv"
 BACKTEST_SUMMARY_CSV_FILENAME = "backtest_summary.csv"
+BACKTEST_EQUITY_CURVE_CSV_FILENAME = "equity_curve.csv"
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _BACKTEST_TRADES_HEADERS = (
     "entry_timestamp",
@@ -50,6 +51,11 @@ _BACKTEST_SUMMARY_HEADERS = (
     "profit_factor",
     "avg_win_pnl",
     "avg_loss_pnl",
+    "max_drawdown_pct",
+)
+_BACKTEST_EQUITY_CURVE_HEADERS = (
+    "timestamp",
+    "equity",
 )
 
 
@@ -123,8 +129,29 @@ def export_backtest_summary_to_csv(
                 "profit_factor": _format_csv_metric(result.profit_factor),
                 "avg_win_pnl": result.avg_win_pnl,
                 "avg_loss_pnl": result.avg_loss_pnl,
+                "max_drawdown_pct": result.max_drawdown_pct,
             }
         )
+
+    return csv_path
+
+
+def export_equity_curve_to_csv(
+    equity_curve: Sequence[tuple[int, float]],
+    output_path: str | Path = BACKTEST_EQUITY_CURVE_CSV_FILENAME,
+) -> Path:
+    csv_path = _resolve_output_path(output_path)
+
+    with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=_BACKTEST_EQUITY_CURVE_HEADERS)
+        writer.writeheader()
+        for timestamp, equity in equity_curve:
+            writer.writerow(
+                {
+                    "timestamp": timestamp,
+                    "equity": equity,
+                }
+            )
 
     return csv_path
 
