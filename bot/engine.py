@@ -129,19 +129,61 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
     final_balance = broker.equity(last_price)
     return_pct = ((final_balance / config.initial_balance) - 1.0) * 100.0
-    wins = sum(1 for pnl in closed_trade_pnls if pnl > 0)
-    win_rate = (wins / len(closed_trade_pnls) * 100.0) if closed_trade_pnls else 0.0
+    metrics = _calculate_closed_trade_metrics(closed_trade_pnls)
 
     result = SimulationResult(
         initial_balance=config.initial_balance,
         final_balance=final_balance,
         return_pct=return_pct,
         total_trades=total_trades,
-        win_rate_pct=win_rate,
+        win_rate_pct=metrics["win_rate_pct"],
+        closed_trades=metrics["closed_trades"],
+        avg_pnl=metrics["avg_pnl"],
+        best_trade_pnl=metrics["best_trade_pnl"],
+        worst_trade_pnl=metrics["worst_trade_pnl"],
+        profit_factor=metrics["profit_factor"],
+        avg_win_pnl=metrics["avg_win_pnl"],
+        avg_loss_pnl=metrics["avg_loss_pnl"],
         trades=backtest_trades,
     )
     export_backtest_trades_to_csv(result.trades)
     return result
+
+
+def _calculate_closed_trade_metrics(closed_trade_pnls: list[float]) -> dict[str, float | int]:
+    closed_trades = len(closed_trade_pnls)
+    if closed_trades == 0:
+        return {
+            "closed_trades": 0,
+            "win_rate_pct": 0.0,
+            "avg_pnl": 0.0,
+            "best_trade_pnl": 0.0,
+            "worst_trade_pnl": 0.0,
+            "profit_factor": 0.0,
+            "avg_win_pnl": 0.0,
+            "avg_loss_pnl": 0.0,
+        }
+
+    winning_pnls = [pnl for pnl in closed_trade_pnls if pnl > 0]
+    losing_pnls = [pnl for pnl in closed_trade_pnls if pnl < 0]
+    gross_profit = sum(winning_pnls)
+    gross_loss_abs = abs(sum(losing_pnls))
+
+    if gross_loss_abs == 0:
+        profit_factor = float("inf") if gross_profit > 0 else 0.0
+    else:
+        profit_factor = gross_profit / gross_loss_abs
+
+    return {
+        "closed_trades": closed_trades,
+        "win_rate_pct": (len(winning_pnls) / closed_trades) * 100.0,
+        "avg_pnl": sum(closed_trade_pnls) / closed_trades,
+        "best_trade_pnl": max(closed_trade_pnls),
+        "worst_trade_pnl": min(closed_trade_pnls),
+        "profit_factor": profit_factor,
+        "avg_win_pnl": (sum(winning_pnls) / len(winning_pnls)) if winning_pnls else 0.0,
+        "avg_loss_pnl": (sum(losing_pnls) / len(losing_pnls)) if losing_pnls else 0.0,
+    }
 
 
 def _build_backtest_trade(

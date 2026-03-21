@@ -39,4 +39,11 @@ class SimulationResult:
     return_pct: float
     total_trades: int
     win_rate_pct: float
+    closed_trades: int
+    avg_pnl: float
+    best_trade_pnl: float
+    worst_trade_pnl: float
+    profit_factor: float
+    avg_win_pnl: float
+    avg_loss_pnl: float
     trades: list[BacktestTrade]

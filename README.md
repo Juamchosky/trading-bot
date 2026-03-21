@@ -89,3 +89,15 @@ Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detall
 - `quantity`
 - `pnl`
 - `exit_reason` (`signal`, `stop_loss`, `take_profit`, `forced_close`)
+
+Tambien incluye metricas agregadas basadas en trades cerrados:
+
+- `closed_trades`: cantidad de trades cerrados.
+- `avg_pnl`: PnL promedio por trade cerrado.
+- `best_trade_pnl`: mejor PnL entre trades cerrados.
+- `worst_trade_pnl`: peor PnL entre trades cerrados.
+- `profit_factor`: `gross_profit / abs(gross_loss)`; si no hay perdidas, devuelve `inf` (o `0.0` si tampoco hay ganancias).
+- `avg_win_pnl`: promedio de PnL de trades ganadores.
+- `avg_loss_pnl`: promedio de PnL de trades perdedores.
+
+Si no hay trades cerrados, estas metricas devuelven `0` para evitar divisiones por cero.
