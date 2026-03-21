@@ -83,6 +83,9 @@ def main() -> None:
             long_window=long_window,
             trend_filter_enabled=True,
             trend_window=50,
+            volatility_filter_enabled=False,
+            volatility_window=20,
+            min_volatility_pct=0.30,
             stop_loss_pct=stop_loss_pct,
             take_profit_pct=take_profit_pct,      
         )
