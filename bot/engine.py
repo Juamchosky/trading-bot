@@ -20,6 +20,8 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         long_window=config.long_window,
         trend_filter_enabled=config.trend_filter_enabled,
         trend_window=config.trend_window,
+        trend_slope_filter_enabled=config.trend_slope_filter_enabled,
+        trend_slope_lookback=config.trend_slope_lookback,
         volatility_filter_enabled=config.volatility_filter_enabled,
         volatility_window=config.volatility_window,
         min_volatility_pct=config.min_volatility_pct,

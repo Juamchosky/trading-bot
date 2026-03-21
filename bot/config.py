@@ -22,6 +22,8 @@ class SimulationConfig:
     long_window: int = 20
     trend_filter_enabled: bool = False
     trend_window: int = 50
+    trend_slope_filter_enabled: bool = False
+    trend_slope_lookback: int = 3
     volatility_filter_enabled: bool = False
     volatility_window: int = 20
     min_volatility_pct: float = 0.30

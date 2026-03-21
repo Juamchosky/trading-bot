@@ -40,6 +40,10 @@ En `SimulationConfig` podes ajustar:
 - `binance_test_order_qty`: cantidad usada en test order de Binance (default `"0.001"`).
 - `binance_interval`: intervalo de velas de Binance (default `"1h"`).
 - `candle_count`: cantidad de velas para simulacion o backtest historico.
+- `trend_filter_enabled`: habilita/deshabilita filtro de tendencia por SMA (default `False`).
+- `trend_window`: ventana de la SMA de tendencia (default `50`).
+- `trend_slope_filter_enabled`: habilita/deshabilita filtro de pendiente de tendencia (default `False`).
+- `trend_slope_lookback`: velas hacia atras para comparar la pendiente de la SMA de tendencia (default `3`).
 - `volatility_filter_enabled`: habilita/deshabilita filtro de volatilidad para compras (default `False`).
 - `volatility_window`: cantidad de velas recientes usadas para volatilidad promedio (default `20`).
 - `min_volatility_pct`: volatilidad minima promedio (%) para permitir compras (default `0.30`).
@@ -65,6 +69,13 @@ Filtro de volatilidad (simple):
 - se calcula como promedio del retorno porcentual absoluto entre cierres consecutivos en las ultimas `volatility_window` velas.
 - si `volatility_filter_enabled=True` y esa volatilidad promedio es menor a `min_volatility_pct`, se bloquea la seÃ±al `buy`.
 - las seÃ±ales `sell` no se bloquean con este filtro.
+
+Filtro de pendiente de tendencia (simple):
+
+- calcula la SMA de tendencia actual (`trend_window`).
+- calcula la SMA de tendencia de hace `trend_slope_lookback` velas.
+- si `trend_slope_filter_enabled=True` y `SMA_actual <= SMA_pasada`, se bloquea `buy`.
+- si `trend_slope_filter_enabled=False`, se mantiene la logica actual.
 
 ## Binance Spot Testnet (seguro por defecto)
 
@@ -110,7 +121,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`).
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
 
