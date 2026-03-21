@@ -21,9 +21,22 @@ class Trade:
 
 
 @dataclass(frozen=True)
+class BacktestTrade:
+    entry_timestamp: int
+    exit_timestamp: int
+    side: str
+    entry_price: float
+    exit_price: float
+    quantity: float
+    pnl: float
+    exit_reason: str
+
+
+@dataclass(frozen=True)
 class SimulationResult:
     initial_balance: float
     final_balance: float
     return_pct: float
     total_trades: int
     win_rate_pct: float
+    trades: list[BacktestTrade]

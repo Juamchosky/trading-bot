@@ -7,7 +7,7 @@ from bot.execution.binance_executor import (
 from bot.market.binance_data import BinanceMarketDataError, fetch_historical_candles
 from bot.execution.paper_broker import PaperBroker
 from bot.market.simulator import generate_candles
-from bot.models import Candle, SimulationResult
+from bot.models import BacktestTrade, Candle, SimulationResult
 from bot.strategy.sma_cross import SMACrossStrategy
 
 
@@ -25,23 +25,53 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     )
     closes: list[float] = []
     closed_trade_pnls: list[float] = []
+    backtest_trades: list[BacktestTrade] = []
     total_trades = 0
+    open_position_entry_timestamp: int | None = None
 
     for candle in candles:
         if broker.position_qty > 0:
             stop_loss_price = broker.entry_price * (1.0 - config.stop_loss_pct)
             take_profit_price = broker.entry_price * (1.0 + config.take_profit_pct)
             if candle.low <= stop_loss_price:
+                entry_price = broker.entry_price
                 trade = broker.sell_all(stop_loss_price)
                 if trade is not None:
                     total_trades += 1
                     closed_trade_pnls.append(trade.pnl)
+                    backtest_trades.append(
+                        _build_backtest_trade(
+                            entry_timestamp=open_position_entry_timestamp,
+                            exit_timestamp=candle.timestamp,
+                            side="long",
+                            entry_price=entry_price,
+                            exit_price=trade.price,
+                            quantity=trade.quantity,
+                            pnl=trade.pnl,
+                            exit_reason="stop_loss",
+                        )
+                    )
+                    open_position_entry_timestamp = None
                     _maybe_send_test_order(config, binance_executor, side="SELL")
             elif candle.high >= take_profit_price:
+                entry_price = broker.entry_price
                 trade = broker.sell_all(take_profit_price)
                 if trade is not None:
                     total_trades += 1
                     closed_trade_pnls.append(trade.pnl)
+                    backtest_trades.append(
+                        _build_backtest_trade(
+                            entry_timestamp=open_position_entry_timestamp,
+                            exit_timestamp=candle.timestamp,
+                            side="long",
+                            entry_price=entry_price,
+                            exit_price=trade.price,
+                            quantity=trade.quantity,
+                            pnl=trade.pnl,
+                            exit_reason="take_profit",
+                        )
+                    )
+                    open_position_entry_timestamp = None
                     _maybe_send_test_order(config, binance_executor, side="SELL")
 
         closes.append(candle.close)
@@ -50,21 +80,50 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
             trade = broker.buy_all(candle.close)
             if trade is not None:
                 total_trades += 1
+                open_position_entry_timestamp = candle.timestamp
                 _maybe_send_test_order(config, binance_executor, side="BUY")
         elif signal == "sell":
+            entry_price = broker.entry_price
             trade = broker.sell_all(candle.close)
             if trade is not None:
                 total_trades += 1
                 closed_trade_pnls.append(trade.pnl)
+                backtest_trades.append(
+                    _build_backtest_trade(
+                        entry_timestamp=open_position_entry_timestamp,
+                        exit_timestamp=candle.timestamp,
+                        side="long",
+                        entry_price=entry_price,
+                        exit_price=trade.price,
+                        quantity=trade.quantity,
+                        pnl=trade.pnl,
+                        exit_reason="signal",
+                    )
+                )
+                open_position_entry_timestamp = None
                 _maybe_send_test_order(config, binance_executor, side="SELL")
 
     last_price = candles[-1].close
     if broker.position_qty > 0:
         # Force close for final accounting.
+        entry_price = broker.entry_price
         trade = broker.sell_all(last_price)
         if trade is not None:
             total_trades += 1
             closed_trade_pnls.append(trade.pnl)
+            backtest_trades.append(
+                _build_backtest_trade(
+                    entry_timestamp=open_position_entry_timestamp,
+                    exit_timestamp=candles[-1].timestamp,
+                    side="long",
+                    entry_price=entry_price,
+                    exit_price=trade.price,
+                    quantity=trade.quantity,
+                    pnl=trade.pnl,
+                    exit_reason="forced_close",
+                )
+            )
+            open_position_entry_timestamp = None
             _maybe_send_test_order(config, binance_executor, side="SELL")
 
     final_balance = broker.equity(last_price)
@@ -78,6 +137,33 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         return_pct=return_pct,
         total_trades=total_trades,
         win_rate_pct=win_rate,
+        trades=backtest_trades,
+    )
+
+
+def _build_backtest_trade(
+    *,
+    entry_timestamp: int | None,
+    exit_timestamp: int,
+    side: str,
+    entry_price: float,
+    exit_price: float,
+    quantity: float,
+    pnl: float,
+    exit_reason: str,
+) -> BacktestTrade:
+    if entry_timestamp is None:
+        raise ValueError("Backtest trade close detected without a matching entry timestamp.")
+
+    return BacktestTrade(
+        entry_timestamp=entry_timestamp,
+        exit_timestamp=exit_timestamp,
+        side=side,
+        entry_price=entry_price,
+        exit_price=exit_price,
+        quantity=quantity,
+        pnl=pnl,
+        exit_reason=exit_reason,
     )
 
 

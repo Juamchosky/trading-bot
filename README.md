@@ -78,3 +78,14 @@ Imprime:
 - retorno porcentual
 - cantidad de operaciones
 - win rate
+
+Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
+
+- `entry_timestamp`
+- `exit_timestamp`
+- `side`
+- `entry_price`
+- `exit_price`
+- `quantity`
+- `pnl`
+- `exit_reason` (`signal`, `stop_loss`, `take_profit`, `forced_close`)
