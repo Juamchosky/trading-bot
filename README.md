@@ -101,7 +101,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion.
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`).
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
 
