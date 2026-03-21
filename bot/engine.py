@@ -16,7 +16,11 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         short_window=config.short_window,
         long_window=config.long_window,
     )
-    broker = PaperBroker(cash=config.initial_balance, fee_rate=config.fee_rate)
+    broker = PaperBroker(
+        cash=config.initial_balance,
+        fee_rate=config.fee_rate,
+        position_size_pct=config.position_size_pct,
+    )
     closes: list[float] = []
     closed_trade_pnls: list[float] = []
     total_trades = 0

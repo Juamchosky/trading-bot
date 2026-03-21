@@ -7,16 +7,20 @@ from bot.models import Trade
 class PaperBroker:
     cash: float
     fee_rate: float = 0.001
+    position_size_pct: float = 0.25
     position_qty: float = 0.0
     entry_price: float = 0.0
 
     def buy_all(self, price: float) -> Trade | None:
         if self.position_qty > 0.0 or self.cash <= 0.0:
             return None
-        qty = self.cash / (price * (1.0 + self.fee_rate))
+        invest_cash = self.cash * self.position_size_pct
+        if invest_cash <= 0.0:
+            return None
+        qty = invest_cash / (price * (1.0 + self.fee_rate))
         self.position_qty = qty
         self.entry_price = price
-        self.cash = 0.0
+        self.cash -= invest_cash
         return Trade(side="buy", price=price, quantity=qty)
 
     def sell_all(self, price: float) -> Trade | None:
@@ -29,7 +33,7 @@ class PaperBroker:
         buy_cost = qty * self.entry_price
         buy_fee = buy_cost * self.fee_rate
         pnl = proceeds - (buy_cost + buy_fee)
-        self.cash = proceeds
+        self.cash += proceeds
         self.position_qty = 0.0
         self.entry_price = 0.0
         return Trade(side="sell", price=price, quantity=qty, pnl=pnl)
