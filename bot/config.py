@@ -12,3 +12,4 @@ class SimulationConfig:
     random_seed: int = 5
     short_window: int = 10
     long_window: int = 15
+    stop_loss_pct: float = 0.02
