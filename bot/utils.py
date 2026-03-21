@@ -28,6 +28,8 @@ _BACKTEST_SUMMARY_HEADERS = (
     "candle_count",
     "short_window",
     "long_window",
+    "trend_filter_enabled",
+    "trend_window",
     "stop_loss_pct",
     "take_profit_pct",
     "position_size_pct",
@@ -78,10 +80,11 @@ def export_backtest_summary_to_csv(
     output_path: str | Path = BACKTEST_SUMMARY_CSV_FILENAME,
 ) -> Path:
     csv_path = _resolve_output_path(output_path)
+    active_headers = _ensure_summary_headers(csv_path, _BACKTEST_SUMMARY_HEADERS)
     file_exists = csv_path.exists()
 
     with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=_BACKTEST_SUMMARY_HEADERS)
+        writer = csv.DictWriter(csv_file, fieldnames=active_headers, extrasaction="ignore")
         if not file_exists:
             writer.writeheader()
 
@@ -93,6 +96,8 @@ def export_backtest_summary_to_csv(
                 "candle_count": config.candle_count,
                 "short_window": config.short_window,
                 "long_window": config.long_window,
+                "trend_filter_enabled": config.trend_filter_enabled,
+                "trend_window": config.trend_window,
                 "stop_loss_pct": config.stop_loss_pct,
                 "take_profit_pct": config.take_profit_pct,
                 "position_size_pct": config.position_size_pct,
@@ -125,3 +130,39 @@ def _format_csv_metric(value: float) -> float | str:
     if math.isinf(value):
         return "inf"
     return value
+
+
+def _ensure_summary_headers(csv_path: Path, required_headers: Sequence[str]) -> tuple[str, ...]:
+    required = tuple(required_headers)
+    if not csv_path.exists():
+        return required
+
+    with csv_path.open("r", newline="", encoding="utf-8") as csv_file:
+        reader = csv.reader(csv_file)
+        existing_headers = next(reader, [])
+
+    if not existing_headers:
+        return required
+
+    missing = [header for header in required if header not in existing_headers]
+    if not missing:
+        return tuple(existing_headers)
+
+    merged_headers = list(existing_headers) + missing
+    _rewrite_csv_with_headers(csv_path, existing_headers, merged_headers)
+    return tuple(merged_headers)
+
+
+def _rewrite_csv_with_headers(
+    csv_path: Path,
+    existing_headers: Sequence[str],
+    merged_headers: Sequence[str],
+) -> None:
+    with csv_path.open("r", newline="", encoding="utf-8") as source_file:
+        rows = list(csv.DictReader(source_file))
+
+    with csv_path.open("w", newline="", encoding="utf-8") as target_file:
+        writer = csv.DictWriter(target_file, fieldnames=merged_headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
