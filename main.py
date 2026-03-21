@@ -3,10 +3,13 @@ from bot.engine import run_simulation
 
 
 def main() -> None:
-    config = SimulationConfig()
+    config = SimulationConfig(
+        execution_mode="binance_testnet"  # 👈 ACTIVAMOS BINANCE TESTNET
+    )
+
     result = run_simulation(config)
 
-    print("Bot de trading iniciado (modo simulacion)")
+    print(f"Bot de trading iniciado (modo {config.execution_mode})")
     print(f"Balance inicial: {result.initial_balance:.2f}")
     print(f"Balance final:   {result.final_balance:.2f}")
     print(f"Retorno:         {result.return_pct:.2f}%")
