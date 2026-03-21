@@ -9,7 +9,7 @@ from bot.execution.paper_broker import PaperBroker
 from bot.market.simulator import generate_candles
 from bot.models import BacktestTrade, Candle, SimulationResult
 from bot.strategy.sma_cross import SMACrossStrategy
-from bot.utils import export_backtest_trades_to_csv
+from bot.utils import export_backtest_summary_to_csv, export_backtest_trades_to_csv
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
@@ -147,6 +147,7 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         trades=backtest_trades,
     )
     export_backtest_trades_to_csv(result.trades)
+    export_backtest_summary_to_csv(config, result)
     return result
 
 

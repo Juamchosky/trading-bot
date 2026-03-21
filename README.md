@@ -87,6 +87,11 @@ Imprime:
 - avg win pnl
 - avg loss pnl
 
+Tambien genera archivos CSV en la raiz del proyecto:
+
+- `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion.
+
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
 
 - `entry_timestamp`
