@@ -19,6 +19,17 @@ Estructura inicial funcional de un bot de trading con seleccion de modo de ejecu
 python main.py
 ```
 
+Para correr multiples combinaciones de parametros y agregar una fila por corrida en `backtest_summary.csv`:
+
+```bash
+python sweep_backtest.py
+```
+
+Opciones utiles:
+
+- `python sweep_backtest.py --market-data-mode simulated`
+- `python sweep_backtest.py --max-runs 5`
+
 ## Configuracion
 
 En `SimulationConfig` podes ajustar:
