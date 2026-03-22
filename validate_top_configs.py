@@ -20,7 +20,6 @@ from bot.utils import (
 
 MARKET_DATA_MODE: MarketDataMode = "binance_historical"
 CANDLE_COUNTS = [100, 200, 300, 500, 800]
-REGIME_THRESHOLDS = [3.0, 4.0, 5.0, 6.0, 8.0]
 DETAIL_OUTPUT_PATH = Path("validation_scenario_results.csv")
 SUMMARY_OUTPUT_PATH = Path("validation_config_ranking.csv")
 
@@ -42,12 +41,33 @@ BASE_CONFIG = SimulationConfig(
     volatility_filter_enabled=False,
     volatility_window=20,
     min_volatility_pct=0.10,
-    regime_filter_enabled=True,
+    regime_filter_enabled=False,
     regime_window=50,
     min_regime_range_pct=3.0,
     signal_confirmation_bars=0,
     warmup_bars=0,
 )
+
+VARIANT_CONFIGS = [
+    {
+        "variant_name": "regime_filter_enabled=False",
+        "config": replace(
+            BASE_CONFIG,
+            regime_filter_enabled=False,
+            regime_window=50,
+            min_regime_range_pct=3.0,
+        ),
+    },
+    {
+        "variant_name": "regime_filter_enabled=True|min_regime_range_pct=3.0|regime_window=50",
+        "config": replace(
+            BASE_CONFIG,
+            regime_filter_enabled=True,
+            regime_window=50,
+            min_regime_range_pct=3.0,
+        ),
+    },
+]
 
 
 def build_scenarios(candle_counts: list[int]) -> list[dict[str, int | str]]:
@@ -61,6 +81,7 @@ def build_scenarios(candle_counts: list[int]) -> list[dict[str, int | str]]:
 
 
 def run_validation(
+    variant_name: str,
     config_template: SimulationConfig,
     scenarios: list[dict[str, int | str]],
 ) -> dict[str, object]:
@@ -72,11 +93,13 @@ def run_validation(
         result = run_simulation(config)
         scenario_results.append(
             {
-                "variant_name": build_variant_name(config.min_regime_range_pct),
+                "variant_name": variant_name,
                 "scenario_name": scenario["name"],
                 "candle_count": config.candle_count,
                 "regime_range_pct": regime_range_pct,
                 "min_regime_range_pct_configured": config.min_regime_range_pct,
+                "regime_filter_enabled": config.regime_filter_enabled,
+                "regime_window": config.regime_window,
                 "result": result,
             }
         )
@@ -152,10 +175,6 @@ def summarize_results(scenario_results: list[dict[str, object]]) -> dict[str, fl
     }
 
 
-def build_variant_name(min_regime_range_pct: float) -> str:
-    return f"min_regime_range_pct={min_regime_range_pct:.1f}%"
-
-
 def get_result(row: dict[str, object]) -> SimulationResult:
     return row["result"]  # type: ignore[return-value]
 
@@ -172,29 +191,28 @@ def format_metric(value: float) -> str:
     return f"{value:.2f}"
 
 
-def print_run_detail(row: dict[str, object], run_index: int, total_runs: int) -> None:
+def print_run_detail(row: dict[str, object]) -> None:
     result = get_result(row)
     print(
-        f"[{run_index}/{total_runs}] variant={row['variant_name']} | "
-        f"scenario={row['scenario_name']} candles={row['candle_count']} | "
-        f"regime_range_pct_real={float(row['regime_range_pct']):.2f}% | "
+        f"- scenario={row['scenario_name']} candle_count={row['candle_count']} | "
         f"return_pct={result.return_pct:.2f}% | "
-        f"win_rate_pct={result.win_rate_pct:.2f}% | "
         f"profit_factor={format_metric(result.profit_factor)} | "
         f"max_drawdown_pct={result.max_drawdown_pct:.2f}% | "
-        f"closed_trades={result.closed_trades}"
+        f"closed_trades={result.closed_trades} | "
+        f"regime_range_pct_real={float(row['regime_range_pct']):.2f}%"
     )
 
 
 def print_summary(variant_name: str, summary: dict[str, float | int]) -> None:
-    print(f"\nResumen agregado: {variant_name}")
-    print(f"- escenarios evaluados: {summary['runs']}")
+    print(f"\nVariante: {variant_name}")
     print(f"- avg_return_pct: {float(summary['avg_return_pct']):.2f}%")
     print(f"- worst_return_pct: {float(summary['worst_return_pct']):.2f}%")
     print(f"- avg_profit_factor: {format_metric(float(summary['avg_profit_factor']))}")
     print(f"- avg_drawdown_pct: {float(summary['avg_drawdown_pct']):.2f}%")
     print(f"- avg_closed_trades: {float(summary['avg_closed_trades']):.2f}")
-    print("\nResumen regime_range_pct observado")
+    print("- escenarios:")
+    print("  detalle por candle_count")
+    print("Resumen regime_range_pct observado")
     print(
         f"- minimo: {float(summary['min_regime_range_pct_observed']):.2f}% | "
         f"maximo: {float(summary['max_regime_range_pct_observed']):.2f}% | "
@@ -222,6 +240,8 @@ def export_scenario_results(scenario_results: list[dict[str, object]], output_pa
                 "candle_count",
                 "regime_range_pct_real",
                 "min_regime_range_pct_configured",
+                "regime_filter_enabled",
+                "regime_window",
                 "return_pct",
                 "win_rate_pct",
                 "profit_factor",
@@ -243,6 +263,8 @@ def export_scenario_results(scenario_results: list[dict[str, object]], output_pa
                     "min_regime_range_pct_configured": (
                         f"{float(scenario_row['min_regime_range_pct_configured']):.6f}"
                     ),
+                    "regime_filter_enabled": scenario_row["regime_filter_enabled"],
+                    "regime_window": scenario_row["regime_window"],
                     "return_pct": f"{result.return_pct:.6f}",
                     "win_rate_pct": f"{result.win_rate_pct:.6f}",
                     "profit_factor": format_metric(result.profit_factor),
@@ -270,6 +292,8 @@ def export_summary_results(ranked_summaries: list[dict[str, object]], output_pat
                 "min_regime_range_pct_observed",
                 "max_regime_range_pct_observed",
                 "avg_regime_range_pct_observed",
+                "regime_filter_enabled",
+                "regime_window",
                 "min_regime_range_pct_configured",
             ],
         )
@@ -296,6 +320,8 @@ def export_summary_results(ranked_summaries: list[dict[str, object]], output_pat
                     "avg_regime_range_pct_observed": (
                         f"{float(summary['avg_regime_range_pct_observed']):.6f}"
                     ),
+                    "regime_filter_enabled": row["regime_filter_enabled"],
+                    "regime_window": row["regime_window"],
                     "min_regime_range_pct_configured": (
                         f"{float(row['min_regime_range_pct_configured']):.6f}"
                     ),
@@ -318,6 +344,8 @@ def build_ranked_summaries(variant_results: list[dict[str, object]]) -> list[dic
         {
             "rank": index,
             "variant_name": row["variant_name"],
+            "regime_filter_enabled": row["regime_filter_enabled"],
+            "regime_window": row["regime_window"],
             "min_regime_range_pct_configured": row["min_regime_range_pct_configured"],
             "summary": row["summary"],
         }
@@ -356,7 +384,7 @@ def restore_file(path: Path, content: bytes | None) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Compara variantes realistas de regime filter en escenarios de candle_count "
+            "Compara la estrategia base con y sin regime filter en escenarios de candle_count "
             "con parametros fijos y reporta regime_range_pct real observado."
         )
     )
@@ -384,41 +412,41 @@ def main() -> None:
     print(f"- market_data_mode: {MARKET_DATA_MODE}")
     print(f"- symbol: {BASE_CONFIG.symbol}")
     print(f"- candle_count escenarios: {candle_counts}")
-    print(
-        "- thresholds comparados de min_regime_range_pct: "
-        + ", ".join(f"{threshold:.1f}%" for threshold in REGIME_THRESHOLDS)
-    )
     print("- configuracion fija: short=5 long=20 sl=0.02 tp=0.03 pos=0.5")
     print(
         "- filtros: trend=True(50) trend_slope=True(lookback=3) "
-        "volatility=False(min=0.10) regime=True(window=50)"
+        "volatility=False(min=0.10)"
     )
     print(
         f"- riesgo: max_drawdown_limit_pct={BASE_CONFIG.max_drawdown_limit_pct:.1f} "
         "signal_confirmation_bars=0 warmup_bars=0"
     )
+    print("- variantes comparadas:")
+    for variant in VARIANT_CONFIGS:
+        print(f"  {variant['variant_name']}")
 
     try:
         all_scenario_results: list[dict[str, object]] = []
         variant_results: list[dict[str, object]] = []
 
-        for threshold in REGIME_THRESHOLDS:
-            variant_config = replace(BASE_CONFIG, min_regime_range_pct=threshold)
-            validation = run_validation(variant_config, scenarios)
+        for variant in VARIANT_CONFIGS:
+            variant_name = str(variant["variant_name"])
+            variant_config = variant["config"]  # type: ignore[assignment]
+            validation = run_validation(variant_name, variant_config, scenarios)
             scenario_results = validation["scenario_results"]  # type: ignore[assignment]
             summary = validation["summary"]  # type: ignore[assignment]
-            variant_name = build_variant_name(threshold)
 
-            print(f"\nResultados por escenario: {variant_name}")
-            for run_index, row in enumerate(scenario_results, start=1):
-                print_run_detail(row, run_index, len(scenario_results))
             print_summary(variant_name, summary)  # type: ignore[arg-type]
+            for row in scenario_results:
+                print_run_detail(row)
 
             all_scenario_results.extend(scenario_results)
             variant_results.append(
                 {
                     "variant_name": variant_name,
-                    "min_regime_range_pct_configured": threshold,
+                    "regime_filter_enabled": variant_config.regime_filter_enabled,
+                    "regime_window": variant_config.regime_window,
+                    "min_regime_range_pct_configured": variant_config.min_regime_range_pct,
                     "summary": summary,
                 }
             )
