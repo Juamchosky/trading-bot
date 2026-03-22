@@ -3,3 +3,4 @@
 .venv/
 .env
 backtest_trades.csv
+forward_simulation_*.csv

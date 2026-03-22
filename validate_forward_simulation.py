@@ -17,9 +17,9 @@ from bot.utils import (
 )
 
 
-DETAIL_OUTPUT_PATH = Path("forward_simulation_results.csv")
-SUMMARY_OUTPUT_PATH = Path("forward_simulation_summary.csv")
-RANKING_OUTPUT_PATH = Path("forward_simulation_ranking.csv")
+DETAIL_OUTPUT_PATH = Path("regime_filter_forward_results.csv")
+SUMMARY_OUTPUT_PATH = Path("regime_filter_forward_comparison.csv")
+RANKING_OUTPUT_PATH = Path("regime_filter_forward_ranking.csv")
 
 CANDLE_COUNTS = [200, 300, 500]
 RANDOM_SEEDS = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
@@ -45,10 +45,42 @@ BASE_CONFIG = SimulationConfig(
 )
 
 VARIANTS = [
-    {"name": "base_actual", "signal_confirmation_bars": 0, "warmup_bars": 0},
-    {"name": "confirm_1", "signal_confirmation_bars": 1, "warmup_bars": 0},
-    {"name": "warmup_20", "signal_confirmation_bars": 0, "warmup_bars": 20},
-    {"name": "confirm_1_warmup_20", "signal_confirmation_bars": 1, "warmup_bars": 20},
+    {
+        "name": "base_actual",
+        "regime_filter_enabled": False,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 2.0,
+    },
+    {
+        "name": "regime_w50_min2.0",
+        "regime_filter_enabled": True,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 2.0,
+    },
+    {
+        "name": "regime_w50_min3.0",
+        "regime_filter_enabled": True,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 3.0,
+    },
+    {
+        "name": "regime_w50_min4.0",
+        "regime_filter_enabled": True,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 4.0,
+    },
+    {
+        "name": "regime_w50_min5.0",
+        "regime_filter_enabled": True,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 5.0,
+    },
+    {
+        "name": "regime_w50_min6.0",
+        "regime_filter_enabled": True,
+        "regime_window": 50,
+        "min_regime_volatility_pct": 6.0,
+    },
 ]
 
 
@@ -88,16 +120,18 @@ def run_validation(
     for scenario in scenarios:
         config = replace(
             BASE_CONFIG,
-            signal_confirmation_bars=int(variant["signal_confirmation_bars"]),
-            warmup_bars=int(variant["warmup_bars"]),
+            regime_filter_enabled=bool(variant["regime_filter_enabled"]),
+            regime_window=int(variant["regime_window"]),
+            min_regime_volatility_pct=float(variant["min_regime_volatility_pct"]),
             candle_count=int(scenario["candle_count"]),
             random_seed=int(scenario["random_seed"]),
         )
         result = run_simulation(config)
         row = {
             "variant_name": variant["name"],
-            "signal_confirmation_bars": config.signal_confirmation_bars,
-            "warmup_bars": config.warmup_bars,
+            "regime_filter_enabled": config.regime_filter_enabled,
+            "regime_window": config.regime_window,
+            "min_regime_volatility_pct": config.min_regime_volatility_pct,
             "scenario_name": scenario["scenario_name"],
             "symbol": config.symbol,
             "candle_count": config.candle_count,
@@ -160,8 +194,8 @@ def build_variant_ranking(summaries: list[dict[str, object]]) -> list[dict[str, 
         summaries,
         key=lambda row: (
             row["std_return"],
-            -row["avg_return"],
             -row["scenario_win_rate"],
+            -row["avg_return"],
             -row["worst_return"],
             row["avg_drawdown"],
             -safe_value(row["avg_profit_factor"]),
@@ -171,8 +205,9 @@ def build_variant_ranking(summaries: list[dict[str, object]]) -> list[dict[str, 
         {
             "rank": idx,
             "variant_name": row["variant_name"],
-            "signal_confirmation_bars": row["signal_confirmation_bars"],
-            "warmup_bars": row["warmup_bars"],
+            "regime_filter_enabled": row["regime_filter_enabled"],
+            "regime_window": row["regime_window"],
+            "min_regime_volatility_pct": row["min_regime_volatility_pct"],
             "avg_return": row["avg_return"],
             "std_return": row["std_return"],
             "scenario_win_rate": row["scenario_win_rate"],
@@ -190,8 +225,9 @@ def export_detail(results: list[dict[str, object]], output_path: Path) -> None:
             csv_file,
             fieldnames=[
                 "variant_name",
-                "signal_confirmation_bars",
-                "warmup_bars",
+                "regime_filter_enabled",
+                "regime_window",
+                "min_regime_volatility_pct",
                 "scenario_name",
                 "symbol",
                 "candle_count",
@@ -210,8 +246,9 @@ def export_detail(results: list[dict[str, object]], output_path: Path) -> None:
             writer.writerow(
                 {
                     "variant_name": row["variant_name"],
-                    "signal_confirmation_bars": row["signal_confirmation_bars"],
-                    "warmup_bars": row["warmup_bars"],
+                    "regime_filter_enabled": row["regime_filter_enabled"],
+                    "regime_window": row["regime_window"],
+                    "min_regime_volatility_pct": f"{row['min_regime_volatility_pct']:.6f}",
                     "scenario_name": row["scenario_name"],
                     "symbol": row["symbol"],
                     "candle_count": row["candle_count"],
@@ -232,8 +269,9 @@ def export_summary(rows: list[dict[str, object]], output_path: Path) -> None:
             csv_file,
             fieldnames=[
                 "variant_name",
-                "signal_confirmation_bars",
-                "warmup_bars",
+                "regime_filter_enabled",
+                "regime_window",
+                "min_regime_volatility_pct",
                 "runs",
                 "avg_return",
                 "std_return",
@@ -248,8 +286,9 @@ def export_summary(rows: list[dict[str, object]], output_path: Path) -> None:
             writer.writerow(
                 {
                     "variant_name": row["variant_name"],
-                    "signal_confirmation_bars": row["signal_confirmation_bars"],
-                    "warmup_bars": row["warmup_bars"],
+                    "regime_filter_enabled": row["regime_filter_enabled"],
+                    "regime_window": row["regime_window"],
+                    "min_regime_volatility_pct": f"{row['min_regime_volatility_pct']:.6f}",
                     "runs": int(row["runs"]),
                     "avg_return": f"{row['avg_return']:.6f}",
                     "std_return": f"{row['std_return']:.6f}",
@@ -268,8 +307,9 @@ def export_ranking(ranking: list[dict[str, object]], output_path: Path) -> None:
             fieldnames=[
                 "rank",
                 "variant_name",
-                "signal_confirmation_bars",
-                "warmup_bars",
+                "regime_filter_enabled",
+                "regime_window",
+                "min_regime_volatility_pct",
                 "avg_return",
                 "std_return",
                 "scenario_win_rate",
@@ -284,8 +324,9 @@ def export_ranking(ranking: list[dict[str, object]], output_path: Path) -> None:
                 {
                     "rank": row["rank"],
                     "variant_name": row["variant_name"],
-                    "signal_confirmation_bars": row["signal_confirmation_bars"],
-                    "warmup_bars": row["warmup_bars"],
+                    "regime_filter_enabled": row["regime_filter_enabled"],
+                    "regime_window": row["regime_window"],
+                    "min_regime_volatility_pct": f"{row['min_regime_volatility_pct']:.6f}",
                     "avg_return": f"{row['avg_return']:.6f}",
                     "std_return": f"{row['std_return']:.6f}",
                     "scenario_win_rate": f"{row['scenario_win_rate']:.6f}",
@@ -332,8 +373,9 @@ def print_run_detail(row: dict[str, object]) -> None:
 def print_summary(summary: dict[str, object]) -> None:
     print(f"\nResumen global - {summary['variant_name']}")
     print(
-        f"- params: signal_confirmation_bars={summary['signal_confirmation_bars']} "
-        f"warmup_bars={summary['warmup_bars']}"
+        f"- params: regime_filter_enabled={summary['regime_filter_enabled']} "
+        f"regime_window={summary['regime_window']} "
+        f"min_regime_volatility_pct={summary['min_regime_volatility_pct']:.2f}"
     )
     print(f"- avg_return: {summary['avg_return']:.2f}%")
     print(f"- std_return: {summary['std_return']:.2f}")
@@ -344,13 +386,15 @@ def print_summary(summary: dict[str, object]) -> None:
 
 
 def print_ranking(ranking: list[dict[str, object]]) -> None:
-    print("\nRanking final simple entre variantes")
+    print("\nRanking final entre variantes (1) menor std_return, (2) mayor scenario_win_rate, (3) mayor avg_return")
     for row in ranking:
         print(
             f"{row['rank']}. {row['variant_name']} | "
-            f"signal_confirmation_bars={row['signal_confirmation_bars']} | "
-            f"warmup_bars={row['warmup_bars']} | "
+            f"regime_filter_enabled={row['regime_filter_enabled']} | "
+            f"regime_window={row['regime_window']} | "
+            f"min_regime_volatility_pct={row['min_regime_volatility_pct']:.2f} | "
             f"std_return={row['std_return']:.2f} | "
+            f"scenario_win_rate={row['scenario_win_rate']:.2f}% | "
             f"avg_return={row['avg_return']:.2f}% | "
             f"worst_return={row['worst_return']:.2f}% | "
             f"avg_drawdown={row['avg_drawdown']:.2f}% | "
@@ -385,7 +429,7 @@ def main() -> None:
     ]
     snapshots = {path: snapshot_file(path) for path in managed_paths}
 
-    print("Forward simulation de robustez (estrategia base sin regime filter)")
+    print("Forward simulation de robustez con calibracion de regime filter")
     print(f"- symbol={BASE_CONFIG.symbol}")
     print(
         "- fixed_config: short_window=5 long_window=20 stop_loss_pct=0.02 "
@@ -394,13 +438,14 @@ def main() -> None:
     print(
         "- filtros: trend_filter_enabled=True trend_window=50 "
         "trend_slope_filter_enabled=True trend_slope_lookback=3 "
-        "volatility_filter_enabled=False regime_filter_enabled=False"
+        "volatility_filter_enabled=False signal_confirmation_bars=0 warmup_bars=0"
     )
     print("- variantes a comparar:")
     for variant in VARIANTS:
         print(
-            f"  - {variant['name']}: signal_confirmation_bars={variant['signal_confirmation_bars']} "
-            f"warmup_bars={variant['warmup_bars']}"
+            f"  - {variant['name']}: regime_filter_enabled={variant['regime_filter_enabled']} "
+            f"regime_window={variant['regime_window']} "
+            f"min_regime_volatility_pct={variant['min_regime_volatility_pct']}"
         )
     print(f"- escenarios: candle_counts={candle_counts} random_seeds={random_seeds}")
     print(f"- total_runs_por_variante={len(scenarios)}")
@@ -415,8 +460,9 @@ def main() -> None:
             variant_summary = summarize(variant_results)
             variant_summary_row = {
                 "variant_name": variant["name"],
-                "signal_confirmation_bars": variant["signal_confirmation_bars"],
-                "warmup_bars": variant["warmup_bars"],
+                "regime_filter_enabled": variant["regime_filter_enabled"],
+                "regime_window": variant["regime_window"],
+                "min_regime_volatility_pct": variant["min_regime_volatility_pct"],
                 **variant_summary,
             }
             print_summary(variant_summary_row)
@@ -438,3 +484,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

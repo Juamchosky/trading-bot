@@ -38,7 +38,7 @@ _BACKTEST_SUMMARY_HEADERS = (
     "min_volatility_pct",
     "regime_filter_enabled",
     "regime_window",
-    "min_regime_range_pct",
+    "min_regime_volatility_pct",
     "signal_confirmation_bars",
     "warmup_bars",
     "stop_loss_pct",
@@ -63,6 +63,9 @@ _BACKTEST_EQUITY_CURVE_HEADERS = (
     "timestamp",
     "equity",
 )
+_SUMMARY_HEADER_RENAMES = {
+    "min_regime_range_pct": "min_regime_volatility_pct",
+}
 
 
 def export_backtest_trades_to_csv(
@@ -122,7 +125,7 @@ def export_backtest_summary_to_csv(
                 "min_volatility_pct": config.min_volatility_pct,
                 "regime_filter_enabled": config.regime_filter_enabled,
                 "regime_window": config.regime_window,
-                "min_regime_range_pct": config.min_regime_range_pct,
+                "min_regime_volatility_pct": config.min_regime_volatility_pct,
                 "signal_confirmation_bars": config.signal_confirmation_bars,
                 "warmup_bars": config.warmup_bars,
                 "stop_loss_pct": config.stop_loss_pct,
@@ -193,6 +196,10 @@ def _ensure_summary_headers(csv_path: Path, required_headers: Sequence[str]) -> 
     if not existing_headers:
         return required
 
+    migrated_headers = _migrate_summary_headers(csv_path, existing_headers)
+    if migrated_headers != tuple(existing_headers):
+        existing_headers = list(migrated_headers)
+
     missing = [header for header in required if header not in existing_headers]
     if not missing:
         return tuple(existing_headers)
@@ -215,3 +222,44 @@ def _rewrite_csv_with_headers(
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+def _migrate_summary_headers(csv_path: Path, existing_headers: Sequence[str]) -> tuple[str, ...]:
+    renamed_headers = list(existing_headers)
+    rename_map: dict[str, str] = {}
+    remove_old_headers: set[str] = set()
+
+    for old_header, new_header in _SUMMARY_HEADER_RENAMES.items():
+        if old_header in renamed_headers and new_header not in renamed_headers:
+            header_index = renamed_headers.index(old_header)
+            renamed_headers[header_index] = new_header
+            rename_map[old_header] = new_header
+            continue
+        if old_header in renamed_headers and new_header in renamed_headers:
+            remove_old_headers.add(old_header)
+            renamed_headers = [header for header in renamed_headers if header != old_header]
+
+    if not rename_map and not remove_old_headers:
+        return tuple(existing_headers)
+
+    with csv_path.open("r", newline="", encoding="utf-8") as source_file:
+        rows = list(csv.DictReader(source_file))
+
+    with csv_path.open("w", newline="", encoding="utf-8") as target_file:
+        writer = csv.DictWriter(target_file, fieldnames=renamed_headers)
+        writer.writeheader()
+        for row in rows:
+            normalized_row = dict(row)
+            for old_header, new_header in rename_map.items():
+                if old_header in normalized_row and new_header not in normalized_row:
+                    normalized_row[new_header] = normalized_row.pop(old_header)
+            for old_header, new_header in _SUMMARY_HEADER_RENAMES.items():
+                if old_header in remove_old_headers:
+                    old_value = normalized_row.get(old_header, "")
+                    new_value = normalized_row.get(new_header, "")
+                    if old_value and not new_value:
+                        normalized_row[new_header] = old_value
+                    normalized_row.pop(old_header, None)
+            writer.writerow(normalized_row)
+
+    return tuple(renamed_headers)

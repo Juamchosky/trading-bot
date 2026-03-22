@@ -47,9 +47,9 @@ En `SimulationConfig` podes ajustar:
 - `volatility_filter_enabled`: habilita/deshabilita filtro de volatilidad para compras (default `False`).
 - `volatility_window`: cantidad de velas recientes usadas para volatilidad promedio (default `20`).
 - `min_volatility_pct`: volatilidad minima promedio (%) para permitir compras (default `0.30`).
-- `regime_filter_enabled`: habilita/deshabilita filtro simple de regimen para compras (default `False`).
-- `regime_window`: cantidad de cierres recientes usados para medir el rango porcentual (default `50`).
-- `min_regime_range_pct`: rango porcentual minimo (%) para permitir compras (default `1.5`).
+- `regime_filter_enabled`: habilita/deshabilita filtro de regimen para compras (default `False`).
+- `regime_window`: cantidad de cierres recientes usados para calcular volatilidad de retornos (default `50`).
+- `min_regime_volatility_pct`: volatilidad minima (%) de retornos para permitir compras (default `0.30`).
 - `signal_confirmation_bars`: cantidad de velas que el cruce SMA corto>SMA largo debe mantenerse antes de comprar (default `0`).
 - `warmup_bars`: cantidad de velas iniciales a ignorar antes de habilitar señales (default `0`).
 - `max_drawdown_limit_pct`: limite de drawdown maximo (%) para activar kill-switch en backtest. Si es `None`, no aplica.
@@ -77,11 +77,12 @@ Filtro de volatilidad (simple):
 - si `volatility_filter_enabled=True` y esa volatilidad promedio es menor a `min_volatility_pct`, se bloquea la seÃ±al `buy`.
 - las seÃ±ales `sell` no se bloquean con este filtro.
 
-Filtro de regimen (simple):
+Filtro de regimen (volatilidad de retornos):
 
 - toma los ultimos `regime_window` cierres.
-- calcula `(max_close - min_close) / min_close * 100`.
-- si `regime_filter_enabled=True` y ese rango es menor a `min_regime_range_pct`, se bloquea `buy`.
+- calcula retornos porcentuales simples entre cierres consecutivos.
+- calcula la desviacion estandar poblacional de esos retornos y la expresa en `%`.
+- si `regime_filter_enabled=True` y esa volatilidad es menor a `min_regime_volatility_pct`, se bloquea `buy`.
 - las señales `sell` no se retrasan ni se bloquean con este filtro.
 
 Filtro de pendiente de tendencia (simple):
@@ -144,7 +145,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_range_pct`, `signal_confirmation_bars`, `warmup_bars`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
 - `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
