@@ -1,2 +1,2 @@
-runs,avg_return_pct,worst_return_pct,best_return_pct,avg_drawdown_pct,avg_profit_factor
-5,0.515560,-1.097902,1.684931,1.188573,2.44
+runs,avg_return_pct,worst_return_pct,best_return_pct,avg_drawdown_pct,avg_profit_factor,avg_closed_trades,min_regime_range_pct_observed,max_regime_range_pct_observed,avg_regime_range_pct_observed,min_regime_range_pct_configured
+5,0.340331,-1.097902,1.684931,1.233260,1.07,2.400000,4.830791,4.831300,4.830893,1.500000
