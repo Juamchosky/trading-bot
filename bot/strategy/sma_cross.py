@@ -62,7 +62,6 @@ class SMACrossStrategy:
         long_sma = sum(closes[-self.long_window :]) / self.long_window
         trend_sma = None
         long_sma_past = None
-        long_cross_confirmed = True
         current_close = closes[-1]
 
         if self.trend_filter_enabled:
@@ -83,21 +82,13 @@ class SMACrossStrategy:
                 / self.long_window
             )
 
-        if self.signal_confirmation_bars > 0:
-            required_closes = (
-                max(self.short_window, self.long_window) + self.signal_confirmation_bars
-            )
-            if len(closes) < required_closes:
-                return "hold"
-            long_cross_confirmed = _cross_persisted(
+        if short_sma > long_sma:
+            if self.signal_confirmation_bars > 0 and not _buy_cross_confirmed(
                 closes,
                 short_window=self.short_window,
                 long_window=self.long_window,
                 confirmation_bars=self.signal_confirmation_bars,
-            )
-
-        if short_sma > long_sma:
-            if not long_cross_confirmed:
+            ):
                 return "hold"
             if self.trend_filter_enabled and trend_sma is not None and current_close <= trend_sma:
                 return "hold"
@@ -160,20 +151,48 @@ def _returns_stddev_pct(closes: list[float]) -> float:
     return statistics.pstdev(returns_pct)
 
 
-def _cross_persisted(
+def _buy_cross_confirmed(
     closes: list[float],
     *,
     short_window: int,
     long_window: int,
     confirmation_bars: int,
 ) -> bool:
+    required_closes = long_window + confirmation_bars + 1
+    if len(closes) < required_closes:
+        return False
+
+    # The cross must have happened confirmation_bars candles ago or less recently,
+    # and the bullish relation must still hold on each candle since then.
     for bars_ago in range(confirmation_bars + 1):
-        end_index = len(closes) - bars_ago
-        if end_index < long_window:
+        if not _is_bullish_sma_relation(
+            closes,
+            short_window=short_window,
+            long_window=long_window,
+            bars_ago=bars_ago,
+        ):
             return False
-        window_closes = closes[:end_index]
-        short_sma = sum(window_closes[-short_window:]) / short_window
-        long_sma = sum(window_closes[-long_window:]) / long_window
-        if short_sma <= long_sma:
-            return False
-    return True
+
+    return not _is_bullish_sma_relation(
+        closes,
+        short_window=short_window,
+        long_window=long_window,
+        bars_ago=confirmation_bars + 1,
+    )
+
+
+def _is_bullish_sma_relation(
+    closes: list[float],
+    *,
+    short_window: int,
+    long_window: int,
+    bars_ago: int,
+) -> bool:
+    end_index = len(closes) - bars_ago
+    if end_index < long_window:
+        return False
+
+    window_closes = closes[:end_index]
+    short_sma = sum(window_closes[-short_window:]) / short_window
+    long_sma = sum(window_closes[-long_window:]) / long_window
+    return short_sma > long_sma

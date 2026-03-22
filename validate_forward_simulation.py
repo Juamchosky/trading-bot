@@ -46,40 +46,34 @@ BASE_CONFIG = SimulationConfig(
 
 VARIANTS = [
     {
-        "name": "base_actual",
+        "name": "base",
         "regime_filter_enabled": False,
         "regime_window": 50,
-        "min_regime_volatility_pct": 2.0,
+        "min_regime_volatility_pct": 0.2,
     },
     {
-        "name": "regime_w50_min2.0",
+        "name": "regime_w50_min0.2",
         "regime_filter_enabled": True,
         "regime_window": 50,
-        "min_regime_volatility_pct": 2.0,
+        "min_regime_volatility_pct": 0.2,
     },
     {
-        "name": "regime_w50_min3.0",
+        "name": "regime_w50_min0.3",
         "regime_filter_enabled": True,
         "regime_window": 50,
-        "min_regime_volatility_pct": 3.0,
+        "min_regime_volatility_pct": 0.3,
     },
     {
-        "name": "regime_w50_min4.0",
+        "name": "regime_w50_min0.5",
         "regime_filter_enabled": True,
         "regime_window": 50,
-        "min_regime_volatility_pct": 4.0,
+        "min_regime_volatility_pct": 0.5,
     },
     {
-        "name": "regime_w50_min5.0",
+        "name": "regime_w50_min0.7",
         "regime_filter_enabled": True,
         "regime_window": 50,
-        "min_regime_volatility_pct": 5.0,
-    },
-    {
-        "name": "regime_w50_min6.0",
-        "regime_filter_enabled": True,
-        "regime_window": 50,
-        "min_regime_volatility_pct": 6.0,
+        "min_regime_volatility_pct": 0.7,
     },
 ]
 
@@ -430,6 +424,10 @@ def main() -> None:
     snapshots = {path: snapshot_file(path) for path in managed_paths}
 
     print("Forward simulation de robustez con calibracion de regime filter")
+    if args.minimal:
+        print("- modo=minimal (validacion rapida, 2 seeds x 2 candle_counts)")
+    else:
+        print("- modo=full (todos los escenarios solicitados)")
     print(f"- symbol={BASE_CONFIG.symbol}")
     print(
         "- fixed_config: short_window=5 long_window=20 stop_loss_pct=0.02 "

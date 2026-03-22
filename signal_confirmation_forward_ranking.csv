@@ -1,0 +1,5 @@
+rank,variant_name,signal_confirmation_bars,avg_return,std_return,scenario_win_rate,worst_return,avg_drawdown,avg_profit_factor
+1,signal_confirmation_1,1,0.181958,1.013580,36.666667,-1.097902,1.267160,1.987704
+2,signal_confirmation_2,2,0.487040,1.213564,60.000000,-1.386057,1.162873,1.653127
+3,signal_confirmation_3,3,0.681289,1.762095,60.000000,-1.494437,1.134030,1.697043
+4,signal_confirmation_0,0,0.663887,1.833349,50.000000,-1.097902,1.287881,2.353202
