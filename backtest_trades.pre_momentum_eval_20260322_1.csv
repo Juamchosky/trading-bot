@@ -1,0 +1,2 @@
+entry_timestamp,exit_timestamp,side,entry_price,exit_price,quantity,pnl,exit_reason
+1700004380000,1700006540000,long,30263.444537480253,30099.617779143908,0.16505077565836404,-37.00270379348149,signal

@@ -23,6 +23,8 @@ class SMACrossStrategy:
         momentum_filter_enabled: bool = False,
         momentum_window: int = 14,
         min_momentum_rsi: float = 55.0,
+        breakout_filter_enabled: bool = False,
+        breakout_lookback: int = 5,
     ) -> None:
         if short_window >= long_window:
             raise ValueError("short_window debe ser menor que long_window")
@@ -46,6 +48,8 @@ class SMACrossStrategy:
             raise ValueError("momentum_window debe ser mayor que cero")
         if not (0.0 <= min_momentum_rsi <= 100.0):
             raise ValueError("min_momentum_rsi debe estar entre 0 y 100")
+        if breakout_lookback <= 0:
+            raise ValueError("breakout_lookback debe ser mayor que cero")
         self.short_window = short_window
         self.long_window = long_window
         self.trend_filter_enabled = trend_filter_enabled
@@ -63,6 +67,8 @@ class SMACrossStrategy:
         self.momentum_filter_enabled = momentum_filter_enabled
         self.momentum_window = momentum_window
         self.min_momentum_rsi = min_momentum_rsi
+        self.breakout_filter_enabled = breakout_filter_enabled
+        self.breakout_lookback = breakout_lookback
 
     def signal(self, closes: list[float]) -> str:
         if len(closes) <= self.warmup_bars:
@@ -130,8 +136,18 @@ class SMACrossStrategy:
                     return "hold"
                 if rsi < self.min_momentum_rsi:
                     return "hold"
+            if self.breakout_filter_enabled and not _is_buy_breakout(
+                closes,
+                breakout_lookback=self.breakout_lookback,
+            ):
+                return "hold"
             return "buy"
         if short_sma < long_sma:
+            if self.breakout_filter_enabled and not _is_sell_breakout(
+                closes,
+                breakout_lookback=self.breakout_lookback,
+            ):
+                return "hold"
             return "sell"
         return "hold"
 
@@ -197,6 +213,30 @@ def _buy_cross_confirmed(
         long_window=long_window,
         bars_ago=confirmation_bars + 1,
     )
+
+
+def _is_buy_breakout(closes: list[float], *, breakout_lookback: int) -> bool:
+    recent_closes = _recent_breakout_reference_closes(closes, breakout_lookback)
+    if recent_closes is None:
+        return False
+    return closes[-1] > max(recent_closes)
+
+
+def _is_sell_breakout(closes: list[float], *, breakout_lookback: int) -> bool:
+    recent_closes = _recent_breakout_reference_closes(closes, breakout_lookback)
+    if recent_closes is None:
+        return False
+    return closes[-1] < min(recent_closes)
+
+
+def _recent_breakout_reference_closes(
+    closes: list[float],
+    breakout_lookback: int,
+) -> list[float] | None:
+    required_closes = breakout_lookback + 1
+    if len(closes) < required_closes:
+        return None
+    return closes[-required_closes:-1]
 
 
 def _is_bullish_sma_relation(
