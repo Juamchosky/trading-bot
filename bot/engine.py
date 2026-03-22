@@ -41,8 +41,6 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     equity_curve: list[tuple[int, float]] = []
     total_trades = 0
     open_position_entry_timestamp: int | None = None
-    equity_peak: float | None = None
-    max_drawdown_pct = 0.0
 
     for candle in candles:
         if broker.position_qty > 0:
@@ -119,15 +117,10 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
                 _maybe_send_test_order(config, binance_executor, side="SELL")
 
         current_equity = broker.equity(candle.close)
-        equity_curve.append((candle.timestamp, current_equity))
-        equity_peak, max_drawdown_pct = _update_drawdown_metrics(
-            equity=current_equity,
-            equity_peak=equity_peak,
-            max_drawdown_pct=max_drawdown_pct,
-        )
+        _upsert_equity_point(equity_curve, candle.timestamp, current_equity)
 
-    last_price = candles[-1].close
-    if broker.position_qty > 0:
+    last_price = candles[-1].close if candles else config.starting_price
+    if candles and broker.position_qty > 0:
         # Force close for final accounting.
         entry_price = broker.entry_price
         trade = broker.sell_all(last_price)
@@ -151,17 +144,9 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
     final_balance = broker.equity(last_price)
     if candles:
-        final_timestamp = candles[-1].timestamp
-        if not equity_curve or equity_curve[-1][0] != final_timestamp:
-            equity_curve.append((final_timestamp, final_balance))
-        else:
-            equity_curve[-1] = (final_timestamp, final_balance)
+        _upsert_equity_point(equity_curve, candles[-1].timestamp, final_balance)
 
-        equity_peak, max_drawdown_pct = _update_drawdown_metrics(
-            equity=final_balance,
-            equity_peak=equity_peak,
-            max_drawdown_pct=max_drawdown_pct,
-        )
+    max_drawdown_pct = _calculate_max_drawdown_pct(equity_curve)
 
     return_pct = ((final_balance / config.initial_balance) - 1.0) * 100.0
     metrics = _calculate_closed_trade_metrics(closed_trade_pnls)
@@ -189,22 +174,35 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     return result
 
 
-def _update_drawdown_metrics(
-    *,
+def _upsert_equity_point(
+    equity_curve: list[tuple[int, float]],
+    timestamp: int,
     equity: float,
-    equity_peak: float | None,
-    max_drawdown_pct: float,
-) -> tuple[float, float]:
-    if equity_peak is None or equity > equity_peak:
-        return equity, max_drawdown_pct
+) -> None:
+    if not equity_curve or equity_curve[-1][0] != timestamp:
+        equity_curve.append((timestamp, equity))
+        return
 
-    if equity_peak <= 0:
-        return equity_peak, max_drawdown_pct
+    equity_curve[-1] = (timestamp, equity)
 
-    drawdown_pct = ((equity_peak - equity) / equity_peak) * 100.0
-    if drawdown_pct > max_drawdown_pct:
-        return equity_peak, drawdown_pct
-    return equity_peak, max_drawdown_pct
+
+def _calculate_max_drawdown_pct(equity_curve: list[tuple[int, float]]) -> float:
+    equity_peak: float | None = None
+    max_drawdown_pct = 0.0
+
+    for _, equity in equity_curve:
+        if equity_peak is None or equity > equity_peak:
+            equity_peak = equity
+            continue
+
+        if equity_peak <= 0:
+            continue
+
+        drawdown_pct = ((equity_peak - equity) / equity_peak) * 100.0
+        if drawdown_pct > max_drawdown_pct:
+            max_drawdown_pct = drawdown_pct
+
+    return max_drawdown_pct
 
 
 def _calculate_closed_trade_metrics(closed_trade_pnls: list[float]) -> dict[str, float | int]:
