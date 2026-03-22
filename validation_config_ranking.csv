@@ -1,2 +1,6 @@
-runs,avg_return_pct,worst_return_pct,best_return_pct,avg_drawdown_pct,avg_profit_factor,avg_closed_trades,min_regime_range_pct_observed,max_regime_range_pct_observed,avg_regime_range_pct_observed,min_regime_range_pct_configured
-5,0.340331,-1.097902,1.684931,1.233260,1.07,2.400000,4.830791,4.831300,4.830893,1.500000
+rank,variant_name,runs,avg_return_pct,worst_return_pct,best_return_pct,avg_drawdown_pct,avg_profit_factor,avg_closed_trades,min_regime_range_pct_observed,max_regime_range_pct_observed,avg_regime_range_pct_observed,min_regime_range_pct_configured
+1,min_regime_range_pct=3.0%,5,0.340331,-1.097902,1.684931,1.233260,1.07,2.400000,4.631618,4.631618,4.631618,3.000000
+2,min_regime_range_pct=8.0%,5,0.132289,-1.788790,3.198370,1.205963,1.02,2.200000,4.631618,4.631618,4.631618,8.000000
+3,min_regime_range_pct=5.0%,5,0.104023,-1.097902,1.684931,1.175968,0.92,2.000000,4.631618,4.631618,4.631618,5.000000
+4,min_regime_range_pct=4.0%,5,0.062074,-1.097902,1.684931,1.233260,0.92,2.200000,4.631618,4.631618,4.631618,4.000000
+5,min_regime_range_pct=6.0%,5,-0.032222,-1.097902,1.684931,1.218956,0.76,1.600000,4.631618,4.631618,4.631618,6.000000

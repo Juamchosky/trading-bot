@@ -20,6 +20,7 @@ from bot.utils import (
 
 MARKET_DATA_MODE: MarketDataMode = "binance_historical"
 CANDLE_COUNTS = [100, 200, 300, 500, 800]
+REGIME_THRESHOLDS = [3.0, 4.0, 5.0, 6.0, 8.0]
 DETAIL_OUTPUT_PATH = Path("validation_scenario_results.csv")
 SUMMARY_OUTPUT_PATH = Path("validation_config_ranking.csv")
 
@@ -43,7 +44,7 @@ BASE_CONFIG = SimulationConfig(
     min_volatility_pct=0.10,
     regime_filter_enabled=True,
     regime_window=50,
-    min_regime_range_pct=1.5,
+    min_regime_range_pct=3.0,
     signal_confirmation_bars=0,
     warmup_bars=0,
 )
@@ -71,9 +72,11 @@ def run_validation(
         result = run_simulation(config)
         scenario_results.append(
             {
+                "variant_name": build_variant_name(config.min_regime_range_pct),
                 "scenario_name": scenario["name"],
                 "candle_count": config.candle_count,
                 "regime_range_pct": regime_range_pct,
+                "min_regime_range_pct_configured": config.min_regime_range_pct,
                 "result": result,
             }
         )
@@ -149,6 +152,10 @@ def summarize_results(scenario_results: list[dict[str, object]]) -> dict[str, fl
     }
 
 
+def build_variant_name(min_regime_range_pct: float) -> str:
+    return f"min_regime_range_pct={min_regime_range_pct:.1f}%"
+
+
 def get_result(row: dict[str, object]) -> SimulationResult:
     return row["result"]  # type: ignore[return-value]
 
@@ -168,7 +175,8 @@ def format_metric(value: float) -> str:
 def print_run_detail(row: dict[str, object], run_index: int, total_runs: int) -> None:
     result = get_result(row)
     print(
-        f"[{run_index}/{total_runs}] scenario={row['scenario_name']} candles={row['candle_count']} | "
+        f"[{run_index}/{total_runs}] variant={row['variant_name']} | "
+        f"scenario={row['scenario_name']} candles={row['candle_count']} | "
         f"regime_range_pct_real={float(row['regime_range_pct']):.2f}% | "
         f"return_pct={result.return_pct:.2f}% | "
         f"win_rate_pct={result.win_rate_pct:.2f}% | "
@@ -178,8 +186,8 @@ def print_run_detail(row: dict[str, object], run_index: int, total_runs: int) ->
     )
 
 
-def print_summary(summary: dict[str, float | int]) -> None:
-    print("\nResumen agregado")
+def print_summary(variant_name: str, summary: dict[str, float | int]) -> None:
+    print(f"\nResumen agregado: {variant_name}")
     print(f"- escenarios evaluados: {summary['runs']}")
     print(f"- avg_return_pct: {float(summary['avg_return_pct']):.2f}%")
     print(f"- worst_return_pct: {float(summary['worst_return_pct']):.2f}%")
@@ -196,10 +204,10 @@ def print_summary(summary: dict[str, float | int]) -> None:
 
 def export_validation_outputs(
     scenario_results: list[dict[str, object]],
-    summary: dict[str, float | int],
+    ranked_summaries: list[dict[str, object]],
 ) -> None:
     export_scenario_results(scenario_results, DETAIL_OUTPUT_PATH)
-    export_summary_results(summary, SUMMARY_OUTPUT_PATH)
+    export_summary_results(ranked_summaries, SUMMARY_OUTPUT_PATH)
     print(f"\nArchivo detalle exportado: {DETAIL_OUTPUT_PATH}")
     print(f"Archivo resumen exportado: {SUMMARY_OUTPUT_PATH}")
 
@@ -209,6 +217,7 @@ def export_scenario_results(scenario_results: list[dict[str, object]], output_pa
         writer = csv.DictWriter(
             csv_file,
             fieldnames=[
+                "variant_name",
                 "scenario_name",
                 "candle_count",
                 "regime_range_pct_real",
@@ -227,10 +236,13 @@ def export_scenario_results(scenario_results: list[dict[str, object]], output_pa
             result = get_result(scenario_row)
             writer.writerow(
                 {
+                    "variant_name": scenario_row["variant_name"],
                     "scenario_name": scenario_row["scenario_name"],
                     "candle_count": scenario_row["candle_count"],
                     "regime_range_pct_real": f"{float(scenario_row['regime_range_pct']):.6f}",
-                    "min_regime_range_pct_configured": f"{BASE_CONFIG.min_regime_range_pct:.6f}",
+                    "min_regime_range_pct_configured": (
+                        f"{float(scenario_row['min_regime_range_pct_configured']):.6f}"
+                    ),
                     "return_pct": f"{result.return_pct:.6f}",
                     "win_rate_pct": f"{result.win_rate_pct:.6f}",
                     "profit_factor": format_metric(result.profit_factor),
@@ -241,11 +253,13 @@ def export_scenario_results(scenario_results: list[dict[str, object]], output_pa
             )
 
 
-def export_summary_results(summary: dict[str, float | int], output_path: Path) -> None:
+def export_summary_results(ranked_summaries: list[dict[str, object]], output_path: Path) -> None:
     with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(
             csv_file,
             fieldnames=[
+                "rank",
+                "variant_name",
                 "runs",
                 "avg_return_pct",
                 "worst_return_pct",
@@ -260,20 +274,68 @@ def export_summary_results(summary: dict[str, float | int], output_path: Path) -
             ],
         )
         writer.writeheader()
-        writer.writerow(
-            {
-                "runs": summary["runs"],
-                "avg_return_pct": f"{float(summary['avg_return_pct']):.6f}",
-                "worst_return_pct": f"{float(summary['worst_return_pct']):.6f}",
-                "best_return_pct": f"{float(summary['best_return_pct']):.6f}",
-                "avg_drawdown_pct": f"{float(summary['avg_drawdown_pct']):.6f}",
-                "avg_profit_factor": format_metric(float(summary["avg_profit_factor"])),
-                "avg_closed_trades": f"{float(summary['avg_closed_trades']):.6f}",
-                "min_regime_range_pct_observed": f"{float(summary['min_regime_range_pct_observed']):.6f}",
-                "max_regime_range_pct_observed": f"{float(summary['max_regime_range_pct_observed']):.6f}",
-                "avg_regime_range_pct_observed": f"{float(summary['avg_regime_range_pct_observed']):.6f}",
-                "min_regime_range_pct_configured": f"{BASE_CONFIG.min_regime_range_pct:.6f}",
-            }
+        for row in ranked_summaries:
+            summary = row["summary"]  # type: ignore[assignment]
+            writer.writerow(
+                {
+                    "rank": row["rank"],
+                    "variant_name": row["variant_name"],
+                    "runs": summary["runs"],
+                    "avg_return_pct": f"{float(summary['avg_return_pct']):.6f}",
+                    "worst_return_pct": f"{float(summary['worst_return_pct']):.6f}",
+                    "best_return_pct": f"{float(summary['best_return_pct']):.6f}",
+                    "avg_drawdown_pct": f"{float(summary['avg_drawdown_pct']):.6f}",
+                    "avg_profit_factor": format_metric(float(summary["avg_profit_factor"])),
+                    "avg_closed_trades": f"{float(summary['avg_closed_trades']):.6f}",
+                    "min_regime_range_pct_observed": (
+                        f"{float(summary['min_regime_range_pct_observed']):.6f}"
+                    ),
+                    "max_regime_range_pct_observed": (
+                        f"{float(summary['max_regime_range_pct_observed']):.6f}"
+                    ),
+                    "avg_regime_range_pct_observed": (
+                        f"{float(summary['avg_regime_range_pct_observed']):.6f}"
+                    ),
+                    "min_regime_range_pct_configured": (
+                        f"{float(row['min_regime_range_pct_configured']):.6f}"
+                    ),
+                }
+            )
+
+
+def build_ranked_summaries(variant_results: list[dict[str, object]]) -> list[dict[str, object]]:
+    ranked = sorted(
+        variant_results,
+        key=lambda row: (
+            -float(row["summary"]["avg_return_pct"]),  # type: ignore[index]
+            -float(row["summary"]["worst_return_pct"]),  # type: ignore[index]
+            -float(row["summary"]["avg_profit_factor"]),  # type: ignore[index]
+            float(row["summary"]["avg_drawdown_pct"]),  # type: ignore[index]
+            -float(row["summary"]["avg_closed_trades"]),  # type: ignore[index]
+        ),
+    )
+    return [
+        {
+            "rank": index,
+            "variant_name": row["variant_name"],
+            "min_regime_range_pct_configured": row["min_regime_range_pct_configured"],
+            "summary": row["summary"],
+        }
+        for index, row in enumerate(ranked, start=1)
+    ]
+
+
+def print_ranking(ranked_summaries: list[dict[str, object]]) -> None:
+    print("\nRanking final simple")
+    for row in ranked_summaries:
+        summary = row["summary"]  # type: ignore[assignment]
+        print(
+            f"{row['rank']}. {row['variant_name']} | "
+            f"avg_return_pct={float(summary['avg_return_pct']):.2f}% | "
+            f"worst_return_pct={float(summary['worst_return_pct']):.2f}% | "
+            f"avg_profit_factor={format_metric(float(summary['avg_profit_factor']))} | "
+            f"avg_drawdown_pct={float(summary['avg_drawdown_pct']):.2f}% | "
+            f"avg_closed_trades={float(summary['avg_closed_trades']):.2f}"
         )
 
 
@@ -294,14 +356,14 @@ def restore_file(path: Path, content: bytes | None) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Diagnostica regime filter en escenarios de candle_count con parametros fijos "
-            "y reporta regime_range_pct real observado."
+            "Compara variantes realistas de regime filter en escenarios de candle_count "
+            "con parametros fijos y reporta regime_range_pct real observado."
         )
     )
     parser.add_argument(
         "--minimal",
         action="store_true",
-        help="Corre una validacion rapida (solo 2 escenarios) para smoke test.",
+        help="Corre una validacion rapida (solo 2 escenarios por variante) para smoke test.",
     )
     return parser.parse_args()
 
@@ -322,7 +384,10 @@ def main() -> None:
     print(f"- market_data_mode: {MARKET_DATA_MODE}")
     print(f"- symbol: {BASE_CONFIG.symbol}")
     print(f"- candle_count escenarios: {candle_counts}")
-    print(f"- min_regime_range_pct configurado: {BASE_CONFIG.min_regime_range_pct:.1f}%")
+    print(
+        "- thresholds comparados de min_regime_range_pct: "
+        + ", ".join(f"{threshold:.1f}%" for threshold in REGIME_THRESHOLDS)
+    )
     print("- configuracion fija: short=5 long=20 sl=0.02 tp=0.03 pos=0.5")
     print(
         "- filtros: trend=True(50) trend_slope=True(lookback=3) "
@@ -334,16 +399,33 @@ def main() -> None:
     )
 
     try:
-        validation = run_validation(BASE_CONFIG, scenarios)
-        scenario_results = validation["scenario_results"]  # type: ignore[assignment]
-        summary = validation["summary"]  # type: ignore[assignment]
+        all_scenario_results: list[dict[str, object]] = []
+        variant_results: list[dict[str, object]] = []
 
-        print("\nResultados por escenario")
-        for run_index, row in enumerate(scenario_results, start=1):
-            print_run_detail(row, run_index, len(scenario_results))
-        print_summary(summary)  # type: ignore[arg-type]
+        for threshold in REGIME_THRESHOLDS:
+            variant_config = replace(BASE_CONFIG, min_regime_range_pct=threshold)
+            validation = run_validation(variant_config, scenarios)
+            scenario_results = validation["scenario_results"]  # type: ignore[assignment]
+            summary = validation["summary"]  # type: ignore[assignment]
+            variant_name = build_variant_name(threshold)
 
-        export_validation_outputs(scenario_results, summary)  # type: ignore[arg-type]
+            print(f"\nResultados por escenario: {variant_name}")
+            for run_index, row in enumerate(scenario_results, start=1):
+                print_run_detail(row, run_index, len(scenario_results))
+            print_summary(variant_name, summary)  # type: ignore[arg-type]
+
+            all_scenario_results.extend(scenario_results)
+            variant_results.append(
+                {
+                    "variant_name": variant_name,
+                    "min_regime_range_pct_configured": threshold,
+                    "summary": summary,
+                }
+            )
+
+        ranked_summaries = build_ranked_summaries(variant_results)
+        print_ranking(ranked_summaries)
+        export_validation_outputs(all_scenario_results, ranked_summaries)
     finally:
         for path, content in snapshots.items():
             restore_file(path, content)
