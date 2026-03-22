@@ -44,6 +44,13 @@ BASE_CONFIG = SimulationConfig(
     warmup_bars=0,
 )
 
+VARIANTS = [
+    {"name": "base_actual", "signal_confirmation_bars": 0, "warmup_bars": 0},
+    {"name": "confirm_1", "signal_confirmation_bars": 1, "warmup_bars": 0},
+    {"name": "warmup_20", "signal_confirmation_bars": 0, "warmup_bars": 20},
+    {"name": "confirm_1_warmup_20", "signal_confirmation_bars": 1, "warmup_bars": 20},
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -74,16 +81,23 @@ def build_scenarios(candle_counts: list[int], seeds: list[int]) -> list[dict[str
     return scenarios
 
 
-def run_validation(scenarios: list[dict[str, int | str]]) -> list[dict[str, object]]:
+def run_validation(
+    scenarios: list[dict[str, int | str]], variant: dict[str, int | str]
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for scenario in scenarios:
         config = replace(
             BASE_CONFIG,
+            signal_confirmation_bars=int(variant["signal_confirmation_bars"]),
+            warmup_bars=int(variant["warmup_bars"]),
             candle_count=int(scenario["candle_count"]),
             random_seed=int(scenario["random_seed"]),
         )
         result = run_simulation(config)
         row = {
+            "variant_name": variant["name"],
+            "signal_confirmation_bars": config.signal_confirmation_bars,
+            "warmup_bars": config.warmup_bars,
             "scenario_name": scenario["scenario_name"],
             "symbol": config.symbol,
             "candle_count": config.candle_count,
@@ -119,7 +133,7 @@ def summarize(results: list[dict[str, object]]) -> dict[str, float]:
     }
 
 
-def build_ranking(results: list[dict[str, object]]) -> list[dict[str, object]]:
+def build_scenario_ranking(results: list[dict[str, object]]) -> list[dict[str, object]]:
     ranked = sorted(
         results,
         key=lambda row: (
@@ -141,11 +155,43 @@ def build_ranking(results: list[dict[str, object]]) -> list[dict[str, object]]:
     ]
 
 
+def build_variant_ranking(summaries: list[dict[str, object]]) -> list[dict[str, object]]:
+    ranked = sorted(
+        summaries,
+        key=lambda row: (
+            row["std_return"],
+            -row["avg_return"],
+            -row["scenario_win_rate"],
+            -row["worst_return"],
+            row["avg_drawdown"],
+            -safe_value(row["avg_profit_factor"]),
+        ),
+    )
+    return [
+        {
+            "rank": idx,
+            "variant_name": row["variant_name"],
+            "signal_confirmation_bars": row["signal_confirmation_bars"],
+            "warmup_bars": row["warmup_bars"],
+            "avg_return": row["avg_return"],
+            "std_return": row["std_return"],
+            "scenario_win_rate": row["scenario_win_rate"],
+            "worst_return": row["worst_return"],
+            "avg_drawdown": row["avg_drawdown"],
+            "avg_profit_factor": row["avg_profit_factor"],
+        }
+        for idx, row in enumerate(ranked, start=1)
+    ]
+
+
 def export_detail(results: list[dict[str, object]], output_path: Path) -> None:
     with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(
             csv_file,
             fieldnames=[
+                "variant_name",
+                "signal_confirmation_bars",
+                "warmup_bars",
                 "scenario_name",
                 "symbol",
                 "candle_count",
@@ -163,6 +209,9 @@ def export_detail(results: list[dict[str, object]], output_path: Path) -> None:
             result = get_result(row)
             writer.writerow(
                 {
+                    "variant_name": row["variant_name"],
+                    "signal_confirmation_bars": row["signal_confirmation_bars"],
+                    "warmup_bars": row["warmup_bars"],
                     "scenario_name": row["scenario_name"],
                     "symbol": row["symbol"],
                     "candle_count": row["candle_count"],
@@ -177,11 +226,14 @@ def export_detail(results: list[dict[str, object]], output_path: Path) -> None:
             )
 
 
-def export_summary(summary: dict[str, float], output_path: Path) -> None:
+def export_summary(rows: list[dict[str, object]], output_path: Path) -> None:
     with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(
             csv_file,
             fieldnames=[
+                "variant_name",
+                "signal_confirmation_bars",
+                "warmup_bars",
                 "runs",
                 "avg_return",
                 "std_return",
@@ -192,17 +244,21 @@ def export_summary(summary: dict[str, float], output_path: Path) -> None:
             ],
         )
         writer.writeheader()
-        writer.writerow(
-            {
-                "runs": int(summary["runs"]),
-                "avg_return": f"{summary['avg_return']:.6f}",
-                "std_return": f"{summary['std_return']:.6f}",
-                "scenario_win_rate": f"{summary['scenario_win_rate']:.6f}",
-                "worst_return": f"{summary['worst_return']:.6f}",
-                "avg_drawdown": f"{summary['avg_drawdown']:.6f}",
-                "avg_profit_factor": format_metric(summary["avg_profit_factor"]),
-            }
-        )
+        for row in rows:
+            writer.writerow(
+                {
+                    "variant_name": row["variant_name"],
+                    "signal_confirmation_bars": row["signal_confirmation_bars"],
+                    "warmup_bars": row["warmup_bars"],
+                    "runs": int(row["runs"]),
+                    "avg_return": f"{row['avg_return']:.6f}",
+                    "std_return": f"{row['std_return']:.6f}",
+                    "scenario_win_rate": f"{row['scenario_win_rate']:.6f}",
+                    "worst_return": f"{row['worst_return']:.6f}",
+                    "avg_drawdown": f"{row['avg_drawdown']:.6f}",
+                    "avg_profit_factor": format_metric(row["avg_profit_factor"]),
+                }
+            )
 
 
 def export_ranking(ranking: list[dict[str, object]], output_path: Path) -> None:
@@ -211,28 +267,31 @@ def export_ranking(ranking: list[dict[str, object]], output_path: Path) -> None:
             csv_file,
             fieldnames=[
                 "rank",
-                "scenario_name",
-                "candle_count",
-                "random_seed",
-                "return_pct",
-                "profit_factor",
-                "max_drawdown_pct",
-                "win_rate",
+                "variant_name",
+                "signal_confirmation_bars",
+                "warmup_bars",
+                "avg_return",
+                "std_return",
+                "scenario_win_rate",
+                "worst_return",
+                "avg_drawdown",
+                "avg_profit_factor",
             ],
         )
         writer.writeheader()
         for row in ranking:
-            result = row["result"]  # type: ignore[assignment]
             writer.writerow(
                 {
                     "rank": row["rank"],
-                    "scenario_name": row["scenario_name"],
-                    "candle_count": row["candle_count"],
-                    "random_seed": row["random_seed"],
-                    "return_pct": f"{result.return_pct:.6f}",
-                    "profit_factor": format_metric(result.profit_factor),
-                    "max_drawdown_pct": f"{result.max_drawdown_pct:.6f}",
-                    "win_rate": f"{result.win_rate_pct:.6f}",
+                    "variant_name": row["variant_name"],
+                    "signal_confirmation_bars": row["signal_confirmation_bars"],
+                    "warmup_bars": row["warmup_bars"],
+                    "avg_return": f"{row['avg_return']:.6f}",
+                    "std_return": f"{row['std_return']:.6f}",
+                    "scenario_win_rate": f"{row['scenario_win_rate']:.6f}",
+                    "worst_return": f"{row['worst_return']:.6f}",
+                    "avg_drawdown": f"{row['avg_drawdown']:.6f}",
+                    "avg_profit_factor": format_metric(row["avg_profit_factor"]),
                 }
             )
 
@@ -262,7 +321,7 @@ def format_metric(value: float) -> str:
 def print_run_detail(row: dict[str, object]) -> None:
     result = get_result(row)
     print(
-        f"- {row['scenario_name']} | "
+        f"- {row['variant_name']} | {row['scenario_name']} | "
         f"return_pct={result.return_pct:.2f}% | "
         f"win_rate={result.win_rate_pct:.2f}% | "
         f"max_drawdown_pct={result.max_drawdown_pct:.2f}% | "
@@ -270,8 +329,12 @@ def print_run_detail(row: dict[str, object]) -> None:
     )
 
 
-def print_summary(summary: dict[str, float]) -> None:
-    print("\nResumen global")
+def print_summary(summary: dict[str, object]) -> None:
+    print(f"\nResumen global - {summary['variant_name']}")
+    print(
+        f"- params: signal_confirmation_bars={summary['signal_confirmation_bars']} "
+        f"warmup_bars={summary['warmup_bars']}"
+    )
     print(f"- avg_return: {summary['avg_return']:.2f}%")
     print(f"- std_return: {summary['std_return']:.2f}")
     print(f"- scenario_win_rate: {summary['scenario_win_rate']:.2f}%")
@@ -280,16 +343,18 @@ def print_summary(summary: dict[str, float]) -> None:
     print(f"- avg_profit_factor: {format_metric(summary['avg_profit_factor'])}")
 
 
-def print_ranking(ranking: list[dict[str, object]], limit: int = 10) -> None:
-    print("\nRanking simple (top escenarios)")
-    for row in ranking[:limit]:
-        result = row["result"]  # type: ignore[assignment]
+def print_ranking(ranking: list[dict[str, object]]) -> None:
+    print("\nRanking final simple entre variantes")
+    for row in ranking:
         print(
-            f"{row['rank']}. {row['scenario_name']} | "
-            f"return_pct={result.return_pct:.2f}% | "
-            f"profit_factor={format_metric(result.profit_factor)} | "
-            f"max_drawdown_pct={result.max_drawdown_pct:.2f}% | "
-            f"win_rate={result.win_rate_pct:.2f}%"
+            f"{row['rank']}. {row['variant_name']} | "
+            f"signal_confirmation_bars={row['signal_confirmation_bars']} | "
+            f"warmup_bars={row['warmup_bars']} | "
+            f"std_return={row['std_return']:.2f} | "
+            f"avg_return={row['avg_return']:.2f}% | "
+            f"worst_return={row['worst_return']:.2f}% | "
+            f"avg_drawdown={row['avg_drawdown']:.2f}% | "
+            f"avg_profit_factor={format_metric(row['avg_profit_factor'])}"
         )
 
 
@@ -331,21 +396,40 @@ def main() -> None:
         "trend_slope_filter_enabled=True trend_slope_lookback=3 "
         "volatility_filter_enabled=False regime_filter_enabled=False"
     )
-    print("- signal_confirmation_bars=0 warmup_bars=0")
+    print("- variantes a comparar:")
+    for variant in VARIANTS:
+        print(
+            f"  - {variant['name']}: signal_confirmation_bars={variant['signal_confirmation_bars']} "
+            f"warmup_bars={variant['warmup_bars']}"
+        )
     print(f"- escenarios: candle_counts={candle_counts} random_seeds={random_seeds}")
-    print(f"- total_runs={len(scenarios)}")
+    print(f"- total_runs_por_variante={len(scenarios)}")
+    print(f"- total_runs_global={len(scenarios) * len(VARIANTS)}")
 
     try:
-        results = run_validation(scenarios)
-        summary = summarize(results)
-        ranking = build_ranking(results)
-        print_summary(summary)
+        all_results: list[dict[str, object]] = []
+        summaries: list[dict[str, object]] = []
+        for variant in VARIANTS:
+            print(f"\nEjecutando variante: {variant['name']}")
+            variant_results = run_validation(scenarios, variant)
+            variant_summary = summarize(variant_results)
+            variant_summary_row = {
+                "variant_name": variant["name"],
+                "signal_confirmation_bars": variant["signal_confirmation_bars"],
+                "warmup_bars": variant["warmup_bars"],
+                **variant_summary,
+            }
+            print_summary(variant_summary_row)
+            all_results.extend(variant_results)
+            summaries.append(variant_summary_row)
+
+        ranking = build_variant_ranking(summaries)
         print_ranking(ranking)
-        export_detail(results, DETAIL_OUTPUT_PATH)
-        export_summary(summary, SUMMARY_OUTPUT_PATH)
+        export_detail(all_results, DETAIL_OUTPUT_PATH)
+        export_summary(summaries, SUMMARY_OUTPUT_PATH)
         export_ranking(ranking, RANKING_OUTPUT_PATH)
-        print(f"\nCSV detalle: {DETAIL_OUTPUT_PATH}")
-        print(f"CSV resumen: {SUMMARY_OUTPUT_PATH}")
+        print(f"\nCSV detalle por escenario+variante: {DETAIL_OUTPUT_PATH}")
+        print(f"CSV comparativo por variante: {SUMMARY_OUTPUT_PATH}")
         print(f"CSV ranking: {RANKING_OUTPUT_PATH}")
     finally:
         for path, content in snapshots.items():
