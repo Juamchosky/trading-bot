@@ -1,0 +1,4 @@
+rank,short_window,long_window,stop_loss_pct,take_profit_pct,runs,avg_return_pct,std_return_pct,scenario_win_rate_pct,avg_trade_win_rate_pct,worst_return_pct,best_return_pct,avg_drawdown_pct,avg_profit_factor
+1,5,20,0.02,0.03,10,0.320956,1.706121,50.000000,29.158730,-2.183750,3.287582,1.775425,1.12
+2,10,20,0.01,0.05,10,-0.688426,1.473321,30.000000,17.690476,-2.374169,2.783770,1.838016,0.64
+3,8,30,0.01,0.05,10,-0.951238,1.392318,20.000000,8.690476,-2.374169,2.348159,1.829925,0.38
