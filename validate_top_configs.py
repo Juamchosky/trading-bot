@@ -38,6 +38,9 @@ BASE_CONFIG = SimulationConfig(
     volatility_filter_enabled=False,
     volatility_window=20,
     min_volatility_pct=0.10,
+    regime_filter_enabled=True,
+    regime_window=50,
+    min_regime_range_pct=1.5,
     signal_confirmation_bars=0,
     warmup_bars=0,
 )
@@ -230,7 +233,10 @@ def main() -> None:
     print(f"- symbol: {BASE_CONFIG.symbol}")
     print(f"- candle_count escenarios: {CANDLE_COUNTS}")
     print("- configuracion fija: short=5 long=20 sl=0.02 tp=0.03 pos=0.5")
-    print("- filtros: trend=True(50) trend_slope=True(lookback=3) volatility=False")
+    print(
+        "- filtros: trend=True(50) trend_slope=True(lookback=3) "
+        "volatility=False regime=True(window=50,min=1.5%)"
+    )
     print(
         f"- riesgo: max_drawdown_limit_pct={BASE_CONFIG.max_drawdown_limit_pct:.1f} "
         "signal_confirmation_bars=0 warmup_bars=0"

@@ -27,6 +27,9 @@ class SimulationConfig:
     volatility_filter_enabled: bool = False
     volatility_window: int = 20
     min_volatility_pct: float = 0.30
+    regime_filter_enabled: bool = False
+    regime_window: int = 50
+    min_regime_range_pct: float = 1.5
     signal_confirmation_bars: int = 0
     warmup_bars: int = 0
     stop_loss_pct: float = 0.02

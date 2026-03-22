@@ -29,6 +29,9 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         volatility_filter_enabled=config.volatility_filter_enabled,
         volatility_window=config.volatility_window,
         min_volatility_pct=config.min_volatility_pct,
+        regime_filter_enabled=config.regime_filter_enabled,
+        regime_window=config.regime_window,
+        min_regime_range_pct=config.min_regime_range_pct,
         signal_confirmation_bars=config.signal_confirmation_bars,
         warmup_bars=config.warmup_bars,
     )

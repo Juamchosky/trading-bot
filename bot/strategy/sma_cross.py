@@ -10,6 +10,9 @@ class SMACrossStrategy:
         volatility_filter_enabled: bool = False,
         volatility_window: int = 20,
         min_volatility_pct: float = 0.30,
+        regime_filter_enabled: bool = False,
+        regime_window: int = 50,
+        min_regime_range_pct: float = 1.5,
         signal_confirmation_bars: int = 0,
         warmup_bars: int = 0,
     ) -> None:
@@ -23,6 +26,10 @@ class SMACrossStrategy:
             raise ValueError("volatility_window debe ser mayor que 1")
         if min_volatility_pct < 0:
             raise ValueError("min_volatility_pct no puede ser negativo")
+        if regime_window <= 0:
+            raise ValueError("regime_window debe ser mayor que cero")
+        if min_regime_range_pct < 0:
+            raise ValueError("min_regime_range_pct no puede ser negativo")
         if signal_confirmation_bars < 0:
             raise ValueError("signal_confirmation_bars no puede ser negativo")
         if warmup_bars < 0:
@@ -36,6 +43,9 @@ class SMACrossStrategy:
         self.volatility_filter_enabled = volatility_filter_enabled
         self.volatility_window = volatility_window
         self.min_volatility_pct = min_volatility_pct
+        self.regime_filter_enabled = regime_filter_enabled
+        self.regime_window = regime_window
+        self.min_regime_range_pct = min_regime_range_pct
         self.signal_confirmation_bars = signal_confirmation_bars
         self.warmup_bars = warmup_bars
 
@@ -101,6 +111,13 @@ class SMACrossStrategy:
                 volatility_pct = _average_abs_return_pct(recent_closes)
                 if volatility_pct < self.min_volatility_pct:
                     return "hold"
+            if self.regime_filter_enabled:
+                if len(closes) < self.regime_window:
+                    return "hold"
+                recent_closes = closes[-self.regime_window :]
+                regime_range_pct = _close_range_pct(recent_closes)
+                if regime_range_pct < self.min_regime_range_pct:
+                    return "hold"
             return "buy"
         if short_sma < long_sma:
             return "sell"
@@ -121,6 +138,18 @@ def _average_abs_return_pct(closes: list[float]) -> float:
     if not abs_returns_pct:
         return 0.0
     return sum(abs_returns_pct) / len(abs_returns_pct)
+
+
+def _close_range_pct(closes: list[float]) -> float:
+    if not closes:
+        return 0.0
+
+    min_close = min(closes)
+    if min_close <= 0:
+        return 0.0
+
+    max_close = max(closes)
+    return ((max_close - min_close) / min_close) * 100.0
 
 
 def _cross_persisted(
