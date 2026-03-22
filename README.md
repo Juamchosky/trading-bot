@@ -52,6 +52,9 @@ En `SimulationConfig` podes ajustar:
 - `min_regime_volatility_pct`: volatilidad minima (%) de retornos para permitir compras (default `0.30`).
 - `signal_confirmation_bars`: cantidad de velas que el cruce SMA corto>SMA largo debe mantenerse antes de comprar (default `0`).
 - `warmup_bars`: cantidad de velas iniciales a ignorar antes de habilitar señales (default `0`).
+- `momentum_filter_enabled`: habilita/deshabilita filtro de momentum RSI para compras (default `False`).
+- `momentum_window`: cantidad de cierres usados para calcular RSI simple (default `14`).
+- `min_momentum_rsi`: RSI minimo requerido para permitir compras cuando el filtro esta activo (default `55.0`).
 - `max_drawdown_limit_pct`: limite de drawdown maximo (%) para activar kill-switch en backtest. Si es `None`, no aplica.
 
 Comportamiento por modo:
@@ -101,6 +104,13 @@ Warmup:
 
 - si `warmup_bars > 0`, la estrategia devuelve `hold` durante las primeras `warmup_bars` velas.
 
+Filtro de momentum RSI (simple):
+
+- usa RSI clasico simple sobre los ultimos `momentum_window` cambios de cierre.
+- si `momentum_filter_enabled=True` y no hay suficientes datos, se bloquea `buy` (`hold`).
+- si `momentum_filter_enabled=True` y `RSI < min_momentum_rsi`, se bloquea `buy`.
+- las señales `sell` no se bloquean con este filtro.
+
 ## Binance Spot Testnet (seguro por defecto)
 
 El executor de Binance usa por defecto `https://testnet.binance.vision` y requiere variables de entorno:
@@ -145,7 +155,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `momentum_filter_enabled`, `momentum_window`, `min_momentum_rsi`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
 - `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
@@ -171,3 +181,4 @@ Tambien incluye metricas agregadas basadas en trades cerrados:
 - `max_drawdown_pct`: peor drawdown porcentual observado durante la corrida.
 
 Si no hay trades cerrados, estas metricas devuelven `0` para evitar divisiones por cero.
+

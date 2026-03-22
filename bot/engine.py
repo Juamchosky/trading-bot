@@ -34,6 +34,9 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         min_regime_volatility_pct=config.min_regime_volatility_pct,
         signal_confirmation_bars=config.signal_confirmation_bars,
         warmup_bars=config.warmup_bars,
+        momentum_filter_enabled=config.momentum_filter_enabled,
+        momentum_window=config.momentum_window,
+        min_momentum_rsi=config.min_momentum_rsi,
     )
     broker = PaperBroker(
         cash=config.initial_balance,

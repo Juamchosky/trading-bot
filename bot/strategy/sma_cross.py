@@ -1,5 +1,7 @@
 import statistics
 
+from bot.utils import calculate_simple_rsi
+
 
 class SMACrossStrategy:
     def __init__(
@@ -18,6 +20,9 @@ class SMACrossStrategy:
         min_regime_volatility_pct: float = 0.30,
         signal_confirmation_bars: int = 0,
         warmup_bars: int = 0,
+        momentum_filter_enabled: bool = False,
+        momentum_window: int = 14,
+        min_momentum_rsi: float = 55.0,
     ) -> None:
         if short_window >= long_window:
             raise ValueError("short_window debe ser menor que long_window")
@@ -37,6 +42,10 @@ class SMACrossStrategy:
             raise ValueError("signal_confirmation_bars no puede ser negativo")
         if warmup_bars < 0:
             raise ValueError("warmup_bars no puede ser negativo")
+        if momentum_window <= 0:
+            raise ValueError("momentum_window debe ser mayor que cero")
+        if not (0.0 <= min_momentum_rsi <= 100.0):
+            raise ValueError("min_momentum_rsi debe estar entre 0 y 100")
         self.short_window = short_window
         self.long_window = long_window
         self.trend_filter_enabled = trend_filter_enabled
@@ -51,6 +60,9 @@ class SMACrossStrategy:
         self.min_regime_volatility_pct = min_regime_volatility_pct
         self.signal_confirmation_bars = signal_confirmation_bars
         self.warmup_bars = warmup_bars
+        self.momentum_filter_enabled = momentum_filter_enabled
+        self.momentum_window = momentum_window
+        self.min_momentum_rsi = min_momentum_rsi
 
     def signal(self, closes: list[float]) -> str:
         if len(closes) <= self.warmup_bars:
@@ -111,6 +123,12 @@ class SMACrossStrategy:
                 recent_closes = closes[-self.regime_window :]
                 regime_volatility_pct = _returns_stddev_pct(recent_closes)
                 if regime_volatility_pct < self.min_regime_volatility_pct:
+                    return "hold"
+            if self.momentum_filter_enabled:
+                rsi = calculate_simple_rsi(closes, self.momentum_window)
+                if rsi is None:
+                    return "hold"
+                if rsi < self.min_momentum_rsi:
                     return "hold"
             return "buy"
         if short_sma < long_sma:

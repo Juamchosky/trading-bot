@@ -1,0 +1,2 @@
+config_name,avg_return,std_return,scenario_win_rate,worst_return,avg_drawdown,avg_profit_factor,total_runs
+candidate_final,0.118106,1.171975,42.187500,-1.386057,1.101430,1.158293,64

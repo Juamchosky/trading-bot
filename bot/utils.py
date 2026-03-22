@@ -41,6 +41,9 @@ _BACKTEST_SUMMARY_HEADERS = (
     "min_regime_volatility_pct",
     "signal_confirmation_bars",
     "warmup_bars",
+    "momentum_filter_enabled",
+    "momentum_window",
+    "min_momentum_rsi",
     "stop_loss_pct",
     "take_profit_pct",
     "max_drawdown_limit_pct",
@@ -128,6 +131,9 @@ def export_backtest_summary_to_csv(
                 "min_regime_volatility_pct": config.min_regime_volatility_pct,
                 "signal_confirmation_bars": config.signal_confirmation_bars,
                 "warmup_bars": config.warmup_bars,
+                "momentum_filter_enabled": config.momentum_filter_enabled,
+                "momentum_window": config.momentum_window,
+                "min_momentum_rsi": config.min_momentum_rsi,
                 "stop_loss_pct": config.stop_loss_pct,
                 "take_profit_pct": config.take_profit_pct,
                 "max_drawdown_limit_pct": config.max_drawdown_limit_pct,
@@ -182,6 +188,34 @@ def _format_csv_metric(value: float) -> float | str:
     if math.isinf(value):
         return "inf"
     return value
+
+
+def calculate_simple_rsi(closes: Sequence[float], window: int) -> float | None:
+    required_closes = window + 1
+    if window <= 0:
+        raise ValueError("window debe ser mayor que cero")
+    if len(closes) < required_closes:
+        return None
+
+    recent_closes = closes[-required_closes:]
+    gains: list[float] = []
+    losses: list[float] = []
+    for previous_close, current_close in zip(recent_closes[:-1], recent_closes[1:]):
+        delta = current_close - previous_close
+        if delta > 0:
+            gains.append(delta)
+            losses.append(0.0)
+        else:
+            gains.append(0.0)
+            losses.append(abs(delta))
+
+    average_gain = sum(gains) / window
+    average_loss = sum(losses) / window
+    if average_loss == 0:
+        return 100.0 if average_gain > 0 else 50.0
+
+    rs = average_gain / average_loss
+    return 100.0 - (100.0 / (1.0 + rs))
 
 
 def _ensure_summary_headers(csv_path: Path, required_headers: Sequence[str]) -> tuple[str, ...]:
