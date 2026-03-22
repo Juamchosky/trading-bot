@@ -41,6 +41,12 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     equity_curve: list[tuple[int, float]] = []
     total_trades = 0
     open_position_entry_timestamp: int | None = None
+    drawdown_limit_active = (
+        config.execution_mode == "paper" and config.max_drawdown_limit_pct is not None
+    )
+    kill_switch_active = False
+    equity_peak: float | None = None
+    running_max_drawdown_pct = 0.0
 
     for candle in candles:
         if broker.position_qty > 0:
@@ -89,7 +95,7 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
         closes.append(candle.close)
         signal = strategy.signal(closes)
-        if signal == "buy":
+        if signal == "buy" and not kill_switch_active:
             trade = broker.buy_all(candle.close)
             if trade is not None:
                 total_trades += 1
@@ -118,6 +124,14 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
         current_equity = broker.equity(candle.close)
         _upsert_equity_point(equity_curve, candle.timestamp, current_equity)
+        if drawdown_limit_active:
+            _, equity_peak, running_max_drawdown_pct = _update_drawdown_tracking(
+                current_equity,
+                equity_peak=equity_peak,
+                running_max_drawdown_pct=running_max_drawdown_pct,
+            )
+            if running_max_drawdown_pct >= config.max_drawdown_limit_pct:
+                kill_switch_active = True
 
     last_price = candles[-1].close if candles else config.starting_price
     if candles and broker.position_qty > 0:
@@ -203,6 +217,25 @@ def _calculate_max_drawdown_pct(equity_curve: list[tuple[int, float]]) -> float:
             max_drawdown_pct = drawdown_pct
 
     return max_drawdown_pct
+
+
+def _update_drawdown_tracking(
+    equity: float,
+    *,
+    equity_peak: float | None,
+    running_max_drawdown_pct: float,
+) -> tuple[float, float | None, float]:
+    if equity_peak is None or equity > equity_peak:
+        return 0.0, equity, running_max_drawdown_pct
+
+    if equity_peak <= 0:
+        return 0.0, equity_peak, running_max_drawdown_pct
+
+    drawdown_pct = ((equity_peak - equity) / equity_peak) * 100.0
+    if drawdown_pct > running_max_drawdown_pct:
+        running_max_drawdown_pct = drawdown_pct
+
+    return drawdown_pct, equity_peak, running_max_drawdown_pct
 
 
 def _calculate_closed_trade_metrics(closed_trade_pnls: list[float]) -> dict[str, float | int]:

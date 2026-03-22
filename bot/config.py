@@ -29,6 +29,7 @@ class SimulationConfig:
     min_volatility_pct: float = 0.30
     stop_loss_pct: float = 0.02
     take_profit_pct: float = 0.05
+    max_drawdown_limit_pct: float | None = None
     position_size_pct: float = 0.20
     execution_mode: ExecutionMode = "paper"
     binance_test_order_qty: str = "0.001"

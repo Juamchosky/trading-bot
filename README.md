@@ -47,6 +47,7 @@ En `SimulationConfig` podes ajustar:
 - `volatility_filter_enabled`: habilita/deshabilita filtro de volatilidad para compras (default `False`).
 - `volatility_window`: cantidad de velas recientes usadas para volatilidad promedio (default `20`).
 - `min_volatility_pct`: volatilidad minima promedio (%) para permitir compras (default `0.30`).
+- `max_drawdown_limit_pct`: limite de drawdown maximo (%) para activar kill-switch en backtest. Si es `None`, no aplica.
 
 Comportamiento por modo:
 
@@ -63,6 +64,7 @@ Fidelidad de ejecucion en backtest:
 - señales de estrategia: se calculan con `close`.
 - stop loss: se evalua con `low` (intra-vela).
 - take profit: se evalua con `high` (intra-vela).
+- kill-switch por drawdown: si `max_drawdown_limit_pct` se alcanza/supera, se bloquean solo nuevas entradas `buy`; los cierres (`signal`, `stop_loss`, `take_profit`, `forced_close`) siguen igual.
 
 Filtro de volatilidad (simple):
 
@@ -121,7 +123,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
 - `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
