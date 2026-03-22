@@ -16,13 +16,7 @@ from bot.utils import (
 )
 
 
-TOP_CONFIGS: list[tuple[int, int, float, float]] = [
-    (8, 30, 0.01, 0.05),
-    (10, 20, 0.01, 0.05),
-    (5, 20, 0.02, 0.03),
-]
-
-MARKET_DATA_MODE: MarketDataMode = "simulated"
+MARKET_DATA_MODE: MarketDataMode = "binance_historical"
 RUNS_PER_CONFIG = 10
 CANDLE_COUNTS = [200, 300, 500]
 BASE_RANDOM_SEED = 5
@@ -34,15 +28,21 @@ BASE_CONFIG = SimulationConfig(
     market_data_mode=MARKET_DATA_MODE,
     symbol="BTCUSDT",
     candle_count=300,
+    short_window=5,
+    long_window=20,
+    stop_loss_pct=0.02,
+    take_profit_pct=0.03,
+    position_size_pct=0.5,
+    max_drawdown_limit_pct=1.5,
     trend_filter_enabled=True,
     trend_window=50,
+    trend_slope_filter_enabled=True,
+    trend_slope_lookback=3,
     volatility_filter_enabled=False,
     volatility_window=20,
     min_volatility_pct=0.10,
-    trend_slope_filter_enabled=True,
-    trend_slope_lookback=3,
-    max_drawdown_limit_pct=1.5,
-    position_size_pct=0.5,
+    signal_confirmation_bars=0,
+    warmup_bars=0,
 )
 
 
@@ -71,45 +71,35 @@ def build_scenarios(
 
 
 def run_validation(
-    parameter_set: tuple[int, int, float, float],
     scenarios: list[dict[str, int | str]],
 ) -> dict[str, object]:
-    short_window, long_window, stop_loss_pct, take_profit_pct = parameter_set
     scenario_results: list[dict[str, object]] = []
 
     for scenario in scenarios:
-        config = replace(
-            BASE_CONFIG,
-            short_window=short_window,
-            long_window=long_window,
-            stop_loss_pct=stop_loss_pct,
-            take_profit_pct=take_profit_pct,
-            candle_count=int(scenario["candle_count"]),
-            random_seed=int(scenario["random_seed"])
-            if "random_seed" in scenario
-            else BASE_CONFIG.random_seed,
-        )
+        config = replace(BASE_CONFIG, candle_count=int(scenario["candle_count"]))
+        if "random_seed" in scenario:
+            config = replace(config, random_seed=int(scenario["random_seed"]))
         result = run_simulation(config)
         scenario_results.append(
             {
                 "scenario_name": scenario["name"],
                 "candle_count": config.candle_count,
-                "random_seed": config.random_seed,
+                "random_seed": scenario.get("random_seed", ""),
                 "result": result,
             }
         )
 
     return {
-        "parameter_set": parameter_set,
+        "signal_confirmation_bars": BASE_CONFIG.signal_confirmation_bars,
         "scenario_results": scenario_results,
-        "summary": summarize_results(parameter_set, scenario_results),
+        "summary": summarize_results(BASE_CONFIG.signal_confirmation_bars, scenario_results),
     }
 
 
 def summarize_results(
-    parameter_set: tuple[int, int, float, float],
+    signal_confirmation_bars: int,
     scenario_results: list[dict[str, object]],
-) -> dict[str, float | int | tuple[int, int, float, float]]:
+) -> dict[str, float | int]:
     returns = [get_result(row).return_pct for row in scenario_results]
     win_rates = [get_result(row).win_rate_pct for row in scenario_results]
     drawdowns = [get_result(row).max_drawdown_pct for row in scenario_results]
@@ -122,7 +112,7 @@ def summarize_results(
     wins = sum(1 for value in returns if value > 0)
 
     return {
-        "parameter_set": parameter_set,
+        "signal_confirmation_bars": signal_confirmation_bars,
         "runs": len(scenario_results),
         "avg_return_pct": safe_mean(returns),
         "std_return_pct": pstdev(returns) if len(returns) > 1 else 0.0,
@@ -156,15 +146,16 @@ def robustness_rank_key(row: dict[str, object]) -> tuple[float, float, float, fl
 
 
 def print_run_detail(
-    parameter_set: tuple[int, int, float, float],
     row: dict[str, object],
     run_index: int,
     total_runs: int,
 ) -> None:
     result = get_result(row)
+    seed_part = f" seed={row['random_seed']}" if row["random_seed"] != "" else ""
     print(
         f"    [{run_index}/{total_runs}] {row['scenario_name']} "
-        f"candles={row['candle_count']} seed={row['random_seed']} "
+        f"signal_confirmation_bars={BASE_CONFIG.signal_confirmation_bars} "
+        f"candles={row['candle_count']}{seed_part} "
         f"return={result.return_pct:.2f}% "
         f"win_rate={result.win_rate_pct:.2f}% "
         f"drawdown={result.max_drawdown_pct:.2f}% "
@@ -172,12 +163,11 @@ def print_run_detail(
     )
 
 
-def print_config_summary(summary: dict[str, float | int | tuple[int, int, float, float]]) -> None:
-    short_window, long_window, stop_loss_pct, take_profit_pct = summary["parameter_set"]  # type: ignore[misc]
+def print_config_summary(summary: dict[str, float | int]) -> None:
+    signal_confirmation_bars = int(summary["signal_confirmation_bars"])
     print(
         "  Resumen -> "
-        f"short={short_window} long={long_window} "
-        f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} | "
+        f"signal_confirmation_bars={signal_confirmation_bars} | "
         f"avg_return={float(summary['avg_return_pct']):.2f}% | "
         f"std_return={float(summary['std_return_pct']):.2f} | "
         f"scenario_win_rate={float(summary['scenario_win_rate_pct']):.2f}% | "
@@ -188,7 +178,7 @@ def print_config_summary(summary: dict[str, float | int | tuple[int, int, float,
 
 
 def print_final_ranking(rows: list[dict[str, object]]) -> None:
-    print("\nRanking final por robustez")
+    print("\nRanking final")
     print(
         "Criterio: mayor scenario_win_rate, luego mayor avg_return, "
         "luego menor std_return, luego mejor worst_return."
@@ -196,14 +186,14 @@ def print_final_ranking(rows: list[dict[str, object]]) -> None:
 
     for index, row in enumerate(rows, start=1):
         summary = row["summary"]  # type: ignore[assignment]
-        short_window, long_window, stop_loss_pct, take_profit_pct = summary["parameter_set"]  # type: ignore[misc]
         print(
-            f"{index}. short={short_window} long={long_window} "
-            f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} | "
+            f"{index}. signal_confirmation_bars={int(summary['signal_confirmation_bars'])} | "
             f"avg_return={float(summary['avg_return_pct']):.2f}% | "
             f"std_return={float(summary['std_return_pct']):.2f} | "
             f"scenario_win_rate={float(summary['scenario_win_rate_pct']):.2f}% | "
-            f"worst={float(summary['worst_return_pct']):.2f}%"
+            f"worst={float(summary['worst_return_pct']):.2f}% | "
+            f"avg_drawdown={float(summary['avg_drawdown_pct']):.2f}% | "
+            f"avg_profit_factor={format_metric(float(summary['avg_profit_factor']))}"
         )
 
 
@@ -225,10 +215,7 @@ def export_scenario_results(rows: list[dict[str, object]], output_path: Path) ->
         writer = csv.DictWriter(
             csv_file,
             fieldnames=[
-                "short_window",
-                "long_window",
-                "stop_loss_pct",
-                "take_profit_pct",
+                "signal_confirmation_bars",
                 "scenario_name",
                 "candle_count",
                 "random_seed",
@@ -243,16 +230,13 @@ def export_scenario_results(rows: list[dict[str, object]], output_path: Path) ->
         writer.writeheader()
 
         for row in rows:
-            short_window, long_window, stop_loss_pct, take_profit_pct = row["parameter_set"]  # type: ignore[misc]
+            signal_confirmation_bars = int(row["signal_confirmation_bars"])
             scenario_results = row["scenario_results"]  # type: ignore[assignment]
             for scenario_row in scenario_results:
                 result = get_result(scenario_row)
                 writer.writerow(
                     {
-                        "short_window": short_window,
-                        "long_window": long_window,
-                        "stop_loss_pct": stop_loss_pct,
-                        "take_profit_pct": take_profit_pct,
+                        "signal_confirmation_bars": signal_confirmation_bars,
                         "scenario_name": scenario_row["scenario_name"],
                         "candle_count": scenario_row["candle_count"],
                         "random_seed": scenario_row["random_seed"],
@@ -273,10 +257,7 @@ def export_summary_results(rows: list[dict[str, object]], output_path: Path) -> 
             csv_file,
             fieldnames=[
                 "rank",
-                "short_window",
-                "long_window",
-                "stop_loss_pct",
-                "take_profit_pct",
+                "signal_confirmation_bars",
                 "runs",
                 "avg_return_pct",
                 "std_return_pct",
@@ -292,14 +273,10 @@ def export_summary_results(rows: list[dict[str, object]], output_path: Path) -> 
 
         for index, row in enumerate(ranking, start=1):
             summary = row["summary"]  # type: ignore[assignment]
-            short_window, long_window, stop_loss_pct, take_profit_pct = summary["parameter_set"]  # type: ignore[misc]
             writer.writerow(
                 {
                     "rank": index,
-                    "short_window": short_window,
-                    "long_window": long_window,
-                    "stop_loss_pct": stop_loss_pct,
-                    "take_profit_pct": take_profit_pct,
+                    "signal_confirmation_bars": int(summary["signal_confirmation_bars"]),
                     "runs": summary["runs"],
                     "avg_return_pct": f"{float(summary['avg_return_pct']):.6f}",
                     "std_return_pct": f"{float(summary['std_return_pct']):.6f}",
@@ -341,10 +318,16 @@ def main() -> None:
     ]
     snapshots = {path: snapshot_file(path) for path in managed_paths}
 
-    print("Validacion de configuraciones top")
+    print("Validacion: configuracion fija en datos reales (binance_historical)")
     print(f"- market_data_mode: {MARKET_DATA_MODE}")
-    print(f"- corridas por configuracion: {len(scenarios)}")
+    print(f"- corridas: {len(scenarios)}")
     print(f"- candle_counts evaluados: {CANDLE_COUNTS}")
+    print(f"- base config fija: short=5 long=20 sl=0.0200 tp=0.0300")
+    print(
+        "- base filtros: trend=True trend_window=50 trend_slope=True "
+        "trend_slope_lookback=3 volatility=False min_volatility_pct=0.10 warmup=0"
+    )
+    print("- signal_confirmation_bars fijo: 0")
     if MARKET_DATA_MODE == "simulated":
         print(
             f"- random_seed evaluados: "
@@ -354,21 +337,18 @@ def main() -> None:
     validation_rows: list[dict[str, object]] = []
 
     try:
-        for parameter_set in TOP_CONFIGS:
-            short_window, long_window, stop_loss_pct, take_profit_pct = parameter_set
-            print(
-                "\nConfiguracion"
-                f" short={short_window} long={long_window}"
-                f" sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f}"
-            )
-            validation = run_validation(parameter_set, scenarios)
-            validation_rows.append(validation)
+        print(
+            "\nConfiguracion fija"
+            f" signal_confirmation_bars={BASE_CONFIG.signal_confirmation_bars}"
+        )
+        validation = run_validation(scenarios)
+        validation_rows.append(validation)
 
-            scenario_results = validation["scenario_results"]  # type: ignore[assignment]
-            for run_index, row in enumerate(scenario_results, start=1):
-                print_run_detail(parameter_set, row, run_index, len(scenario_results))
+        scenario_results = validation["scenario_results"]  # type: ignore[assignment]
+        for run_index, row in enumerate(scenario_results, start=1):
+            print_run_detail(row, run_index, len(scenario_results))
 
-            print_config_summary(validation["summary"])  # type: ignore[arg-type]
+        print_config_summary(validation["summary"])  # type: ignore[arg-type]
     finally:
         for path, content in snapshots.items():
             restore_file(path, content)

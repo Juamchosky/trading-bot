@@ -29,6 +29,8 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         volatility_filter_enabled=config.volatility_filter_enabled,
         volatility_window=config.volatility_window,
         min_volatility_pct=config.min_volatility_pct,
+        signal_confirmation_bars=config.signal_confirmation_bars,
+        warmup_bars=config.warmup_bars,
     )
     broker = PaperBroker(
         cash=config.initial_balance,

@@ -47,6 +47,8 @@ En `SimulationConfig` podes ajustar:
 - `volatility_filter_enabled`: habilita/deshabilita filtro de volatilidad para compras (default `False`).
 - `volatility_window`: cantidad de velas recientes usadas para volatilidad promedio (default `20`).
 - `min_volatility_pct`: volatilidad minima promedio (%) para permitir compras (default `0.30`).
+- `signal_confirmation_bars`: cantidad de velas que el cruce SMA corto>SMA largo debe mantenerse antes de comprar (default `0`).
+- `warmup_bars`: cantidad de velas iniciales a ignorar antes de habilitar señales (default `0`).
 - `max_drawdown_limit_pct`: limite de drawdown maximo (%) para activar kill-switch en backtest. Si es `None`, no aplica.
 
 Comportamiento por modo:
@@ -74,10 +76,19 @@ Filtro de volatilidad (simple):
 
 Filtro de pendiente de tendencia (simple):
 
-- calcula la SMA de tendencia actual (`trend_window`).
-- calcula la SMA de tendencia de hace `trend_slope_lookback` velas.
-- si `trend_slope_filter_enabled=True` y `SMA_actual <= SMA_pasada`, se bloquea `buy`.
+- calcula la SMA larga actual de la estrategia (`long_window`).
+- calcula esa SMA larga de hace `trend_slope_lookback` velas.
+- si `trend_slope_filter_enabled=True` y `SMA_larga_actual <= SMA_larga_pasada`, se bloquea `buy`.
 - si `trend_slope_filter_enabled=False`, se mantiene la logica actual.
+
+Confirmacion de senal:
+
+- si `signal_confirmation_bars > 0`, la compra solo se habilita si el cruce `SMA_corta > SMA_larga` ya estaba presente durante esa cantidad de velas previas.
+- las ventas no esperan confirmacion adicional para no retrasar la salida.
+
+Warmup:
+
+- si `warmup_bars > 0`, la estrategia devuelve `hold` durante las primeras `warmup_bars` velas.
 
 ## Binance Spot Testnet (seguro por defecto)
 
@@ -123,7 +134,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
 - `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:
