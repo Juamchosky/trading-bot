@@ -20,21 +20,21 @@ MARKET_DATA_MODE: MarketDataMode = "binance_historical"
 RUNS_PER_CONFIG = 10
 CANDLE_COUNTS = [200, 300, 500]
 BASE_RANDOM_SEED = 5
-MAX_DRAWDOWN_VARIANTS = [1.5, 1.2, 1.0]
+MAX_DRAWDOWN_VARIANTS = [1.0]
 DETAIL_OUTPUT_PATH = Path("validation_scenario_results.csv")
 SUMMARY_OUTPUT_PATH = Path("validation_config_ranking.csv")
 
 BASE_CONFIG = SimulationConfig(
     execution_mode="paper",
     market_data_mode=MARKET_DATA_MODE,
-    symbol="BTCUSDT",
+    symbol="ETHUSDT",
     candle_count=300,
     short_window=5,
     long_window=20,
     stop_loss_pct=0.02,
     take_profit_pct=0.03,
     position_size_pct=0.5,
-    max_drawdown_limit_pct=1.5,
+    max_drawdown_limit_pct=1.0,
     trend_filter_enabled=True,
     trend_window=50,
     trend_slope_filter_enabled=True,
@@ -325,12 +325,13 @@ def main() -> None:
     print(f"- market_data_mode: {MARKET_DATA_MODE}")
     print(f"- corridas: {len(scenarios)}")
     print(f"- candle_counts evaluados: {CANDLE_COUNTS}")
+    print(f"- symbol: {BASE_CONFIG.symbol}")
     print(f"- base config fija: short=5 long=20 sl=0.0200 tp=0.0300")
     print(
         "- base filtros: trend=True trend_window=50 trend_slope=True "
         "trend_slope_lookback=3 volatility=False min_volatility_pct=0.10 warmup=0"
     )
-    print("- variantes max_drawdown_limit_pct: 1.5, 1.2, 1.0")
+    print(f"- max_drawdown_limit_pct fijo: {BASE_CONFIG.max_drawdown_limit_pct:.1f}")
     if MARKET_DATA_MODE == "simulated":
         print(
             f"- random_seed evaluados: "
