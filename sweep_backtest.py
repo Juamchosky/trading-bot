@@ -13,6 +13,7 @@ DEFAULT_STOP_LOSS_PCTS = [0.01, 0.02]
 DEFAULT_TAKE_PROFIT_PCTS = [0.03, 0.05]
 DEFAULT_BACKTEST_SUMMARY_PATH = Path("backtest_summary.csv")
 DEFAULT_RANDOM_SEEDS = [5]
+DEFAULT_BREAKOUT_MODES = ["off", "strict", "flexible"]
 
 
 def _parse_bool(value: str) -> bool:
@@ -111,7 +112,19 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--momentum-window", type=int, default=14)
     parser.add_argument("--min-momentum-rsi", type=float, default=55.0)
     parser.add_argument("--breakout-filter-enabled", type=_parse_bool, default=False)
+    parser.add_argument("--breakout-strict-mode", type=_parse_bool, default=True)
     parser.add_argument("--breakout-lookback", type=int, default=5)
+    parser.add_argument("--min-trend-strength-pct", type=float, default=0.10)
+    parser.add_argument(
+        "--breakout-mode",
+        choices=("off", "strict", "flexible", "all"),
+        default=None,
+        help=(
+            "Modo de breakout para la corrida. "
+            "Si se omite, usa breakout-filter-enabled + breakout-strict-mode. "
+            "Usa 'all' para comparar off/strict/flexible en el mismo sweep."
+        ),
+    )
     parser.add_argument("--stop-loss-pct-fixed", type=float, default=None)
     parser.add_argument("--take-profit-pct-fixed", type=float, default=None)
     parser.add_argument("--max-drawdown-limit-pct", type=float, default=1.5)
@@ -135,6 +148,26 @@ def _iter_valid_parameter_sets(
         if short_window >= long_window:
             continue
         yield short_window, long_window, stop_loss_pct, take_profit_pct
+
+
+def _resolve_breakout_modes(args: argparse.Namespace) -> list[tuple[bool, bool, str]]:
+    if args.breakout_mode == "all":
+        return [
+            (False, True, "off"),
+            (True, True, "strict"),
+            (True, False, "flexible"),
+        ]
+    if args.breakout_mode == "off":
+        return [(False, True, "off")]
+    if args.breakout_mode == "strict":
+        return [(True, True, "strict")]
+    if args.breakout_mode == "flexible":
+        return [(True, False, "flexible")]
+
+    mode_label = "off"
+    if args.breakout_filter_enabled:
+        mode_label = "strict" if args.breakout_strict_mode else "flexible"
+    return [(args.breakout_filter_enabled, args.breakout_strict_mode, mode_label)]
 
 
 def main() -> None:
@@ -161,7 +194,8 @@ def main() -> None:
         parameter_sets = parameter_sets[: args.max_runs]
 
     random_seeds = args.random_seeds
-    total_runs = len(parameter_sets) * len(random_seeds)
+    breakout_modes = _resolve_breakout_modes(args)
+    total_runs = len(parameter_sets) * len(random_seeds) * len(breakout_modes)
     if total_runs == 0:
         print("No hay combinaciones validas para ejecutar.")
         return
@@ -169,51 +203,56 @@ def main() -> None:
     print(
         f"Iniciando sweep: {total_runs} corridas "
         f"(market_data_mode={args.market_data_mode}, execution_mode=paper, "
-        f"momentum_filter_enabled={args.momentum_filter_enabled})"
+        f"momentum_filter_enabled={args.momentum_filter_enabled}, "
+        f"breakout_modes={','.join(mode_label for _, _, mode_label in breakout_modes)})"
     )
 
     run_index = 0
     for random_seed in random_seeds:
-        for short_window, long_window, stop_loss_pct, take_profit_pct in parameter_sets:
-            run_index += 1
-            config = SimulationConfig(
-                execution_mode="paper",
-                market_data_mode=args.market_data_mode,
-                symbol=args.symbol,
-                candle_count=args.candle_count,
-                random_seed=random_seed,
-                fee_rate=args.fee_rate,
-                short_window=short_window,
-                long_window=long_window,
-                trend_filter_enabled=args.trend_filter_enabled,
-                trend_window=args.trend_window,
-                trend_slope_filter_enabled=args.trend_slope_filter_enabled,
-                trend_slope_lookback=args.trend_slope_lookback,
-                volatility_filter_enabled=args.volatility_filter_enabled,
-                volatility_window=args.volatility_window,
-                min_volatility_pct=args.min_volatility_pct,
-                regime_filter_enabled=args.regime_filter_enabled,
-                regime_window=args.regime_window,
-                min_regime_volatility_pct=args.min_regime_volatility_pct,
-                signal_confirmation_bars=args.signal_confirmation_bars,
-                warmup_bars=args.warmup_bars,
-                momentum_filter_enabled=args.momentum_filter_enabled,
-                momentum_window=args.momentum_window,
-                min_momentum_rsi=args.min_momentum_rsi,
-                breakout_filter_enabled=args.breakout_filter_enabled,
-                breakout_lookback=args.breakout_lookback,
-                stop_loss_pct=stop_loss_pct,
-                take_profit_pct=take_profit_pct,
-                max_drawdown_limit_pct=args.max_drawdown_limit_pct,
-                position_size_pct=args.position_size_pct,
-            )
-            result = run_simulation(config)
-            print(
-                f"[{run_index}/{total_runs}] "
-                f"seed={random_seed} short={short_window} long={long_window} "
-                f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} "
-                f"return={result.return_pct:.2f}% final_balance={result.final_balance:.2f}"
-            )
+        for breakout_filter_enabled, breakout_strict_mode, breakout_mode_label in breakout_modes:
+            for short_window, long_window, stop_loss_pct, take_profit_pct in parameter_sets:
+                run_index += 1
+                config = SimulationConfig(
+                    execution_mode="paper",
+                    market_data_mode=args.market_data_mode,
+                    symbol=args.symbol,
+                    candle_count=args.candle_count,
+                    random_seed=random_seed,
+                    fee_rate=args.fee_rate,
+                    short_window=short_window,
+                    long_window=long_window,
+                    trend_filter_enabled=args.trend_filter_enabled,
+                    trend_window=args.trend_window,
+                    trend_slope_filter_enabled=args.trend_slope_filter_enabled,
+                    trend_slope_lookback=args.trend_slope_lookback,
+                    volatility_filter_enabled=args.volatility_filter_enabled,
+                    volatility_window=args.volatility_window,
+                    min_volatility_pct=args.min_volatility_pct,
+                    regime_filter_enabled=args.regime_filter_enabled,
+                    regime_window=args.regime_window,
+                    min_regime_volatility_pct=args.min_regime_volatility_pct,
+                    signal_confirmation_bars=args.signal_confirmation_bars,
+                    warmup_bars=args.warmup_bars,
+                    momentum_filter_enabled=args.momentum_filter_enabled,
+                    momentum_window=args.momentum_window,
+                    min_momentum_rsi=args.min_momentum_rsi,
+                    breakout_filter_enabled=breakout_filter_enabled,
+                    breakout_strict_mode=breakout_strict_mode,
+                    breakout_lookback=args.breakout_lookback,
+                    min_trend_strength_pct=args.min_trend_strength_pct,
+                    stop_loss_pct=stop_loss_pct,
+                    take_profit_pct=take_profit_pct,
+                    max_drawdown_limit_pct=args.max_drawdown_limit_pct,
+                    position_size_pct=args.position_size_pct,
+                )
+                result = run_simulation(config)
+                print(
+                    f"[{run_index}/{total_runs}] "
+                    f"mode={breakout_mode_label} seed={random_seed} "
+                    f"short={short_window} long={long_window} "
+                    f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} "
+                    f"return={result.return_pct:.2f}% final_balance={result.final_balance:.2f}"
+                )
 
     print(
         "Sweep finalizado. Las corridas quedaron agregadas en "

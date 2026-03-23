@@ -56,7 +56,9 @@ En `SimulationConfig` podes ajustar:
 - `momentum_window`: cantidad de cierres usados para calcular RSI simple (default `14`).
 - `min_momentum_rsi`: RSI minimo requerido para permitir compras cuando el filtro esta activo (default `55.0`).
 - `breakout_filter_enabled`: habilita/deshabilita filtro de breakout por estructura de precio (default `False`).
+- `breakout_strict_mode`: si `True`, exige breakout cuando el filtro esta activo; si `False`, permite breakout o tendencia fuerte (default `True`).
 - `breakout_lookback`: cantidad de cierres previos usados para confirmar ruptura del maximo/minimo (default `5`).
+- `min_trend_strength_pct`: distancia porcentual minima entre `short_sma` y `long_sma` para habilitar la senal en modo flexible (default `0.10`).
 - `max_drawdown_limit_pct`: limite de drawdown maximo (%) para activar kill-switch en backtest. Si es `None`, no aplica.
 
 Comportamiento por modo:
@@ -116,8 +118,12 @@ Filtro de momentum RSI (simple):
 Filtro de breakout por estructura:
 
 - mantiene el SMA cross como condicion base; no reemplaza la logica de cruce.
-- si `breakout_filter_enabled=True`, una compra solo se habilita si el `close` actual es mayor que el maximo de los ultimos `breakout_lookback` cierres previos.
-- si `breakout_filter_enabled=True`, una venta solo se habilita si el `close` actual es menor que el minimo de los ultimos `breakout_lookback` cierres previos.
+- si `breakout_filter_enabled=False`, no agrega ninguna restriccion extra.
+- si `breakout_filter_enabled=True` y `breakout_strict_mode=True`, mantiene el comportamiento historico:
+  compra si el `close` actual es mayor que el maximo de los ultimos `breakout_lookback` cierres previos.
+  venta si el `close` actual es menor que el minimo de los ultimos `breakout_lookback` cierres previos.
+- si `breakout_filter_enabled=True` y `breakout_strict_mode=False`, la senal se permite si hay breakout o si `trend_strength_pct >= min_trend_strength_pct`, donde:
+  `trend_strength_pct = abs(short_sma - long_sma) / long_sma * 100`
 - si no hay suficientes cierres para evaluar la ruptura, la estrategia devuelve `hold`.
 
 ## Binance Spot Testnet (seguro por defecto)
@@ -164,7 +170,7 @@ Imprime:
 Tambien genera archivos CSV en la raiz del proyecto:
 
 - `backtest_trades.csv`: detalle de trades cerrados de la ultima corrida.
-- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `momentum_filter_enabled`, `momentum_window`, `min_momentum_rsi`, `breakout_filter_enabled`, `breakout_lookback`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
+- `backtest_summary.csv`: resumen agregado por corrida, en modo append, una fila nueva por ejecucion, incluyendo metricas y parametros usados (`short_window`, `long_window`, `trend_filter_enabled`, `trend_window`, `trend_slope_filter_enabled`, `trend_slope_lookback`, `volatility_filter_enabled`, `volatility_window`, `min_volatility_pct`, `regime_filter_enabled`, `regime_window`, `min_regime_volatility_pct`, `signal_confirmation_bars`, `warmup_bars`, `momentum_filter_enabled`, `momentum_window`, `min_momentum_rsi`, `breakout_filter_enabled`, `breakout_strict_mode`, `breakout_lookback`, `min_trend_strength_pct`, `stop_loss_pct`, `take_profit_pct`, `max_drawdown_limit_pct`, `position_size_pct`, `fee_rate`, `max_drawdown_pct`).
 - `equity_curve.csv`: curva de equity de la ultima corrida (`timestamp`, `equity`), sobrescrito en cada nueva ejecucion.
 
 Ademas, `run_simulation()` ahora devuelve en `SimulationResult.trades` el detalle de cada trade cerrado del backtest, incluyendo:

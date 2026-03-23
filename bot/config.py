@@ -36,7 +36,9 @@ class SimulationConfig:
     momentum_window: int = 14
     min_momentum_rsi: float = 55.0
     breakout_filter_enabled: bool = False
+    breakout_strict_mode: bool = True
     breakout_lookback: int = 5
+    min_trend_strength_pct: float = 0.10
     stop_loss_pct: float = 0.02
     take_profit_pct: float = 0.05
     max_drawdown_limit_pct: float | None = None

@@ -24,7 +24,9 @@ class SMACrossStrategy:
         momentum_window: int = 14,
         min_momentum_rsi: float = 55.0,
         breakout_filter_enabled: bool = False,
+        breakout_strict_mode: bool = True,
         breakout_lookback: int = 5,
+        min_trend_strength_pct: float = 0.10,
     ) -> None:
         if short_window >= long_window:
             raise ValueError("short_window debe ser menor que long_window")
@@ -50,6 +52,8 @@ class SMACrossStrategy:
             raise ValueError("min_momentum_rsi debe estar entre 0 y 100")
         if breakout_lookback <= 0:
             raise ValueError("breakout_lookback debe ser mayor que cero")
+        if min_trend_strength_pct < 0:
+            raise ValueError("min_trend_strength_pct no puede ser negativo")
         self.short_window = short_window
         self.long_window = long_window
         self.trend_filter_enabled = trend_filter_enabled
@@ -68,7 +72,10 @@ class SMACrossStrategy:
         self.momentum_window = momentum_window
         self.min_momentum_rsi = min_momentum_rsi
         self.breakout_filter_enabled = breakout_filter_enabled
+        self.breakout_strict_mode = breakout_strict_mode
         self.breakout_lookback = breakout_lookback
+        self.min_trend_strength_pct = min_trend_strength_pct
+        self.last_trend_strength_pct = 0.0
 
     def signal(self, closes: list[float]) -> str:
         if len(closes) <= self.warmup_bars:
@@ -78,6 +85,8 @@ class SMACrossStrategy:
 
         short_sma = sum(closes[-self.short_window :]) / self.short_window
         long_sma = sum(closes[-self.long_window :]) / self.long_window
+        trend_strength_pct = _calculate_trend_strength_pct(short_sma, long_sma)
+        self.last_trend_strength_pct = trend_strength_pct
         trend_sma = None
         long_sma_past = None
         current_close = closes[-1]
@@ -136,20 +145,40 @@ class SMACrossStrategy:
                     return "hold"
                 if rsi < self.min_momentum_rsi:
                     return "hold"
-            if self.breakout_filter_enabled and not _is_buy_breakout(
+            buy_breakout_confirmed = _is_buy_breakout(
                 closes,
                 breakout_lookback=self.breakout_lookback,
+            )
+            if not self._passes_breakout_gate(
+                breakout_confirmed=buy_breakout_confirmed,
+                trend_strength_pct=trend_strength_pct,
             ):
                 return "hold"
             return "buy"
         if short_sma < long_sma:
-            if self.breakout_filter_enabled and not _is_sell_breakout(
+            sell_breakout_confirmed = _is_sell_breakout(
                 closes,
                 breakout_lookback=self.breakout_lookback,
+            )
+            if not self._passes_breakout_gate(
+                breakout_confirmed=sell_breakout_confirmed,
+                trend_strength_pct=trend_strength_pct,
             ):
                 return "hold"
             return "sell"
         return "hold"
+
+    def _passes_breakout_gate(
+        self,
+        *,
+        breakout_confirmed: bool,
+        trend_strength_pct: float,
+    ) -> bool:
+        if not self.breakout_filter_enabled:
+            return True
+        if self.breakout_strict_mode:
+            return breakout_confirmed
+        return breakout_confirmed or trend_strength_pct >= self.min_trend_strength_pct
 
 
 def _average_abs_return_pct(closes: list[float]) -> float:
@@ -183,6 +212,12 @@ def _returns_stddev_pct(closes: list[float]) -> float:
         return 0.0
 
     return statistics.pstdev(returns_pct)
+
+
+def _calculate_trend_strength_pct(short_sma: float, long_sma: float) -> float:
+    if long_sma == 0:
+        return 0.0
+    return abs(short_sma - long_sma) / long_sma * 100.0
 
 
 def _buy_cross_confirmed(

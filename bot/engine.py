@@ -38,7 +38,9 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         momentum_window=config.momentum_window,
         min_momentum_rsi=config.min_momentum_rsi,
         breakout_filter_enabled=config.breakout_filter_enabled,
+        breakout_strict_mode=config.breakout_strict_mode,
         breakout_lookback=config.breakout_lookback,
+        min_trend_strength_pct=config.min_trend_strength_pct,
     )
     broker = PaperBroker(
         cash=config.initial_balance,
