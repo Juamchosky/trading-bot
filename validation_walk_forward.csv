@@ -1,0 +1,6 @@
+row_type,split_name,candle_count,train_offset,test_offset,train_return_pct,test_return_pct,train_profit_factor,test_profit_factor,train_drawdown_pct,test_drawdown_pct,train_total_trades,test_total_trades,avg_train_return_pct,avg_test_return_pct,std_test_return_pct,positive_test_rate,zero_trade_test_rate,worst_test_return_pct
+split,split_1,300,800,500,0.808610,0.838073,1.445305,1.551142,1.606987,1.844206,10,10,,,,,,
+split,split_2,300,500,200,0.838073,-0.634614,1.551142,0.788541,1.844206,1.867569,10,12,,,,,,
+split,split_3,300,400,100,2.159273,0.566365,1.709134,1.309702,1.697571,1.867569,18,8,,,,,,
+split,split_4,300,300,0,-0.284203,0.713531,0.525460,1.424323,1.527640,1.593087,4,10,,,,,,
+aggregate,aggregate,300,,,,,,,,,,,0.880438,0.370839,0.588411,0.750000,0.000000,-0.634614
