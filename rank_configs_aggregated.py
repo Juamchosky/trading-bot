@@ -72,10 +72,10 @@ def safe_mean(values: list[float]) -> float | None:
     return sum(values) / len(values)
 
 
-def compute_trade_activity_score(closed_trades: float | None) -> float:
-    if closed_trades is None or closed_trades <= 0:
+def compute_trade_activity_score(zero_trade_rate: float, low_trade_rate: float) -> float:
+    if zero_trade_rate >= 0.30:
         return 0.0
-    if closed_trades < 3:
+    if low_trade_rate >= 0.50:
         return 0.5
     return 1.0
 
@@ -115,7 +115,12 @@ def aggregate_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         avg_profit_factor = safe_mean(profit_factors)
         avg_drawdown = safe_mean(drawdowns)
         avg_closed_trades = safe_mean(closed_trades)
-        activity_score = compute_trade_activity_score(avg_closed_trades)
+        total_runs = len(group_rows)
+        zero_trade_runs = sum(1 for value in closed_trades if value == 0)
+        low_trade_runs = sum(1 for value in closed_trades if value < 3)
+        zero_trade_rate = (zero_trade_runs / total_runs) if total_runs > 0 else 0.0
+        low_trade_rate = (low_trade_runs / total_runs) if total_runs > 0 else 0.0
+        activity_score = compute_trade_activity_score(zero_trade_rate, low_trade_rate)
 
         aggregated_row: dict[str, Any] = dict(zip(GROUP_FIELDS, key))
         aggregated_row.update(
@@ -125,6 +130,10 @@ def aggregate_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                 "avg_profit_factor": avg_profit_factor,
                 "avg_drawdown": avg_drawdown,
                 "closed_trades": avg_closed_trades,
+                "zero_trade_runs": zero_trade_runs,
+                "zero_trade_rate": zero_trade_rate,
+                "low_trade_runs": low_trade_runs,
+                "low_trade_rate": low_trade_rate,
                 "trade_activity_score": activity_score,
                 "adjusted_return": (avg_return * activity_score) if avg_return is not None else None,
                 "adjusted_profit_factor": (avg_profit_factor * activity_score)
@@ -224,6 +233,10 @@ def print_top_with_activity(rows: list[dict[str, Any]], top_n: int = TOP_N) -> N
         "max_drawdown_limit_pct",
         "count",
         "closed_trades",
+        "zero_trade_runs",
+        "zero_trade_rate",
+        "low_trade_runs",
+        "low_trade_rate",
         "trade_activity_score",
         "adjusted_return",
         "adjusted_profit_factor",
@@ -245,6 +258,10 @@ def print_top_with_activity(rows: list[dict[str, Any]], top_n: int = TOP_N) -> N
                 str(row.get("max_drawdown_limit_pct", "N/A")),
                 str(row.get("count", "N/A")),
                 fmt_float(row.get("closed_trades")),
+                str(row.get("zero_trade_runs", "N/A")),
+                fmt_float(row.get("zero_trade_rate")),
+                str(row.get("low_trade_runs", "N/A")),
+                fmt_float(row.get("low_trade_rate")),
                 fmt_float(row.get("trade_activity_score")),
                 fmt_float(row.get("adjusted_return")),
                 fmt_float(row.get("adjusted_profit_factor")),
@@ -321,6 +338,10 @@ def export_rows_with_activity(path: Path, rows: list[dict[str, Any]]) -> None:
         "max_drawdown_limit_pct",
         "count",
         "closed_trades",
+        "zero_trade_runs",
+        "zero_trade_rate",
+        "low_trade_runs",
+        "low_trade_rate",
         "trade_activity_score",
         "avg_return_pct",
         "avg_profit_factor",
@@ -346,6 +367,10 @@ def export_rows_with_activity(path: Path, rows: list[dict[str, Any]]) -> None:
                     "max_drawdown_limit_pct": row.get("max_drawdown_limit_pct"),
                     "count": row.get("count"),
                     "closed_trades": fmt_float(row.get("closed_trades")),
+                    "zero_trade_runs": row.get("zero_trade_runs"),
+                    "zero_trade_rate": fmt_float(row.get("zero_trade_rate")),
+                    "low_trade_runs": row.get("low_trade_runs"),
+                    "low_trade_rate": fmt_float(row.get("low_trade_rate")),
                     "trade_activity_score": fmt_float(row.get("trade_activity_score")),
                     "avg_return_pct": fmt_float(row.get("avg_return_pct")),
                     "avg_profit_factor": fmt_float(row.get("avg_profit_factor")),
