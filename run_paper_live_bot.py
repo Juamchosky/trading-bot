@@ -60,6 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--symbol", default=CandidateConfig.symbol)
     parser.add_argument("--interval", default=CandidateConfig.binance_interval)
     parser.add_argument("--candle-count", type=int, default=CandidateConfig.candle_count)
+    parser.add_argument("--historical-offset", type=int, default=0)
     parser.add_argument("--initial-cash", type=float, default=CandidateConfig.initial_cash)
     parser.add_argument("--fee-rate", type=float, default=CandidateConfig.fee_rate)
     parser.add_argument("--log-path", type=Path, default=LOG_PATH)
@@ -202,7 +203,7 @@ def main() -> None:
             symbol=config.symbol,
             interval=config.binance_interval,
             limit=config.candle_count,
-            historical_offset=0,
+            historical_offset=args.historical_offset,
             base_url=config.binance_spot_base_url,
         )
     except BinanceMarketDataError as exc:
