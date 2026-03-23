@@ -13,6 +13,7 @@ class SimulationConfig:
     fee_rate: float = 0.001
     market_data_mode: MarketDataMode = "simulated"
     candle_count: int = 300
+    historical_offset: int = 0
     starting_price: float = 30_000.0
     volatility: float = 0.01
     random_seed: int = 5

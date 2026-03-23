@@ -19,7 +19,8 @@ from bot.utils import (
 
 
 OUTPUT_PATH = Path("validation_multi_sample_real.csv")
-CANDLE_COUNTS = [150, 200, 300, 500, 800]
+FIXED_CANDLE_COUNT = 300
+HISTORICAL_OFFSETS = [0, 100, 200, 400, 800]
 
 BASE_CONFIG = SimulationConfig(
     execution_mode="paper",
@@ -104,13 +105,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Valida configuraciones candidatas en multiples submuestras reales "
-            "(proxy por candle_count) y rankea por robustez."
+            "(offsets historicos de Binance) y rankea por robustez."
         )
     )
     parser.add_argument(
         "--minimal",
         action="store_true",
-        help="Smoke test rapido (3 candle_counts y 2 configuraciones).",
+        help="Smoke test rapido (3 offsets y 2 configuraciones).",
     )
     return parser.parse_args()
 
@@ -158,23 +159,34 @@ def run_candidate(
     *,
     config_name: str,
     params: dict[str, Any],
-    candle_counts: list[int],
+    candle_count: int,
+    offsets: list[int],
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     scenario_rows: list[dict[str, object]] = []
 
-    for candle_count in candle_counts:
-        config = replace(BASE_CONFIG, candle_count=candle_count, **params)
+    for offset in offsets:
+        scenario_name = f"offset_{offset}"
+        config = replace(
+            BASE_CONFIG,
+            candle_count=candle_count,
+            historical_offset=offset,
+            **params,
+        )
         result = run_simulation(config)
         row = {
             "config_name": config_name,
             "candle_count": candle_count,
+            "historical_offset": offset,
+            "scenario_name": scenario_name,
             "params": params,
             "result": result,
         }
         scenario_rows.append(row)
 
         print(
-            f"- {config_name} | candle_count={candle_count} | "
+            f"- {config_name} | scenario={scenario_name} | "
+            f"candle_count={candle_count} | "
+            f"historical_offset={offset} | "
             f"return_pct={result.return_pct:.2f}% | "
             f"profit_factor={format_metric(result.profit_factor)} | "
             f"drawdown={result.max_drawdown_pct:.2f}% | "
@@ -211,7 +223,8 @@ def summarize_candidate(
         "position_size_pct": params["position_size_pct"],
         "max_drawdown_limit_pct": params["max_drawdown_limit_pct"],
         "runs": runs_count,
-        "candle_counts": "|".join(str(row["candle_count"]) for row in runs),
+        "candle_count": int(runs[0]["candle_count"]) if runs else BASE_CONFIG.candle_count,
+        "offsets": "|".join(str(row["historical_offset"]) for row in runs),
         "avg_return_pct": safe_mean(returns),
         "std_return_pct": statistics.pstdev(returns) if len(returns) > 1 else 0.0,
         "best_return_pct": max(returns) if returns else 0.0,
@@ -288,7 +301,8 @@ def export_summary(ranked_rows: list[dict[str, object]], output_path: Path) -> N
                 "position_size_pct",
                 "max_drawdown_limit_pct",
                 "runs",
-                "candle_counts",
+                "candle_count",
+                "offsets",
                 "avg_return_pct",
                 "std_return_pct",
                 "best_return_pct",
@@ -314,7 +328,8 @@ def export_summary(ranked_rows: list[dict[str, object]], output_path: Path) -> N
                     "position_size_pct": f"{float(row['position_size_pct']):.6f}",
                     "max_drawdown_limit_pct": f"{float(row['max_drawdown_limit_pct']):.6f}",
                     "runs": int(row["runs"]),
-                    "candle_counts": row["candle_counts"],
+                    "candle_count": int(row["candle_count"]),
+                    "offsets": row["offsets"],
                     "avg_return_pct": f"{float(row['avg_return_pct']):.6f}",
                     "std_return_pct": f"{float(row['std_return_pct']):.6f}",
                     "best_return_pct": f"{float(row['best_return_pct']):.6f}",
@@ -331,7 +346,7 @@ def export_summary(ranked_rows: list[dict[str, object]], output_path: Path) -> N
 
 def main() -> None:
     args = parse_args()
-    candle_counts = CANDLE_COUNTS[:3] if args.minimal else CANDLE_COUNTS
+    offsets = HISTORICAL_OFFSETS[:3] if args.minimal else HISTORICAL_OFFSETS
     candidate_configs = CANDIDATE_CONFIGS[:2] if args.minimal else CANDIDATE_CONFIGS
 
     managed_paths = [
@@ -341,14 +356,11 @@ def main() -> None:
     ]
     snapshots = {path: snapshot_file(path) for path in managed_paths}
 
-    print("Validacion multi-sample real (proxy por distintos candle_count)")
+    print("Validacion multi-sample real (offsets historicos de Binance)")
     print("- market_data_mode=binance_historical")
     print(f"- symbol={BASE_CONFIG.symbol}")
-    print(f"- candle_counts={candle_counts}")
-    print(
-        "- nota: no hay offset de historico en el engine actual; "
-        "se usa candle_count como proxy de submuestras reales."
-    )
+    print(f"- candle_count_fijo={FIXED_CANDLE_COUNT}")
+    print(f"- historical_offsets={offsets}")
     print(f"- total configuraciones candidatas={len(candidate_configs)}")
 
     try:
@@ -360,7 +372,8 @@ def main() -> None:
             _, summary = run_candidate(
                 config_name=config_name,
                 params=params,
-                candle_counts=candle_counts,
+                candle_count=FIXED_CANDLE_COUNT,
+                offsets=offsets,
             )
             print_candidate_summary(summary)
             summaries.append(summary)

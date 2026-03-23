@@ -327,6 +327,7 @@ def _load_market_candles(config: SimulationConfig) -> list[Candle]:
                 symbol=config.symbol,
                 interval=config.binance_interval,
                 limit=config.candle_count,
+                historical_offset=config.historical_offset,
                 base_url=config.binance_spot_base_url,
             )
         except BinanceMarketDataError as exc:

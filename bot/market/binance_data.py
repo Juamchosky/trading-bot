@@ -15,16 +15,21 @@ def fetch_historical_candles(
     symbol: str,
     interval: str,
     limit: int,
+    historical_offset: int = 0,
     base_url: str = "https://api.binance.com",
 ) -> list[Candle]:
     if limit <= 0:
         raise BinanceMarketDataError("limit must be greater than zero.")
+    if historical_offset < 0:
+        raise BinanceMarketDataError("historical_offset must be zero or greater.")
+
+    requested_limit = limit + historical_offset
 
     params = urllib.parse.urlencode(
         {
             "symbol": symbol.upper(),
             "interval": interval,
-            "limit": str(limit),
+            "limit": str(requested_limit),
         }
     )
     url = f"{base_url.rstrip('/')}/api/v3/klines?{params}"
@@ -69,4 +74,23 @@ def fetch_historical_candles(
             )
         )
 
-    return candles
+    if historical_offset == 0:
+        return candles
+
+    # Apply the offset from the most recent candle backwards, then restore
+    # chronological order for the rest of the engine.
+    recent_first = list(reversed(candles))
+    selected = list(reversed(recent_first[historical_offset : historical_offset + limit]))
+
+    return [
+        Candle(
+            timestamp=candle.timestamp,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+            index=index,
+        )
+        for index, candle in enumerate(selected)
+    ]
