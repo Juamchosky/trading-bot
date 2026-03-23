@@ -1,0 +1,7 @@
+row_type,rank,asset,config_name,avg_test_return_pct,std_test_return_pct,positive_test_rate,zero_trade_test_rate,worst_test_return_pct,avg_test_profit_factor,avg_test_drawdown_pct,avg_test_total_trades,cross_asset_return_std,split_test_returns
+asset_config_summary,,ETHUSDT,CONFIG_A,0.370839,0.588411,0.750000,0.000000,-0.634614,1.268427,1.793108,10.000000,,split_1=0.84% | split_2=-0.63% | split_3=0.57% | split_4=0.71%
+asset_config_summary,,ETHUSDT,CONFIG_B,0.550580,1.124597,0.750000,0.000000,-1.396418,1.504148,1.616896,6.500000,,split_1=-1.40% | split_2=1.17% | split_3=1.17% | split_4=1.25%
+asset_config_summary,,BTCUSDT,CONFIG_A,0.007196,0.443668,0.500000,0.000000,-0.685970,0.842944,1.910234,9.000000,,split_1=0.48% | split_2=-0.05% | split_3=0.29% | split_4=-0.69%
+asset_config_summary,,BTCUSDT,CONFIG_B,0.935602,0.985613,0.750000,0.000000,-0.300387,3.593440,0.884082,4.500000,,split_1=0.25% | split_2=-0.30% | split_3=1.78% | split_4=2.02%
+config_cross_asset_summary,1,ALL,CONFIG_A,0.189018,0.516039,0.625000,0.000000,-0.685970,1.055686,1.851671,9.500000,0.181821,
+config_cross_asset_summary,2,ALL,CONFIG_B,0.743091,1.055105,0.750000,0.000000,-1.396418,2.548794,1.250489,5.500000,0.192511,
