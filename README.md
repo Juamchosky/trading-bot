@@ -40,6 +40,7 @@ En `SimulationConfig` podes ajustar:
 - `binance_test_order_qty`: cantidad usada en test order de Binance (default `"0.001"`).
 - `binance_interval`: intervalo de velas de Binance (default `"1h"`).
 - `candle_count`: cantidad de velas para simulacion o backtest historico.
+- `historical_offset`: desplaza hacia atras la ventana historica de Binance; descarga `candle_count + historical_offset` y usa una submuestra real del tramo anterior (default `0`).
 - `trend_filter_enabled`: habilita/deshabilita filtro de tendencia por SMA (default `False`).
 - `trend_window`: ventana de la SMA de tendencia (default `50`).
 - `trend_slope_filter_enabled`: habilita/deshabilita filtro de pendiente de tendencia (default `False`).
