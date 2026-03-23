@@ -107,6 +107,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--regime-window", type=int, default=50)
     parser.add_argument("--min-regime-volatility-pct", type=float, default=0.30)
     parser.add_argument("--signal-confirmation-bars", type=int, default=0)
+    parser.add_argument(
+        "--signal-confirmation-bars-values",
+        type=_parse_int_list,
+        default=None,
+        help=(
+            "Comma-separated values to sweep for signal_confirmation_bars. "
+            "If omitted, uses --signal-confirmation-bars."
+        ),
+    )
     parser.add_argument("--warmup-bars", type=int, default=0)
     parser.add_argument("--momentum-filter-enabled", type=_parse_bool, default=False)
     parser.add_argument("--momentum-window", type=int, default=14)
@@ -185,6 +194,12 @@ def _resolve_min_trend_strength_values(args: argparse.Namespace) -> list[float]:
     return [args.min_trend_strength_pct]
 
 
+def _resolve_signal_confirmation_bars_values(args: argparse.Namespace) -> list[int]:
+    if args.signal_confirmation_bars_values is not None:
+        return args.signal_confirmation_bars_values
+    return [args.signal_confirmation_bars]
+
+
 def main() -> None:
     args = _build_argument_parser().parse_args()
     stop_loss_pcts = (
@@ -211,11 +226,13 @@ def main() -> None:
     random_seeds = args.random_seeds
     breakout_modes = _resolve_breakout_modes(args)
     min_trend_strength_values = _resolve_min_trend_strength_values(args)
+    signal_confirmation_bars_values = _resolve_signal_confirmation_bars_values(args)
     total_runs = (
         len(parameter_sets)
         * len(random_seeds)
         * len(breakout_modes)
         * len(min_trend_strength_values)
+        * len(signal_confirmation_bars_values)
     )
     if total_runs == 0:
         print("No hay combinaciones validas para ejecutar.")
@@ -226,57 +243,60 @@ def main() -> None:
         f"(market_data_mode={args.market_data_mode}, execution_mode=paper, "
         f"momentum_filter_enabled={args.momentum_filter_enabled}, "
         f"breakout_modes={','.join(mode_label for _, _, mode_label in breakout_modes)}, "
-        f"min_trend_strength_values={','.join(f'{value:g}' for value in min_trend_strength_values)})"
+        f"min_trend_strength_values={','.join(f'{value:g}' for value in min_trend_strength_values)}, "
+        f"signal_confirmation_bars_values={','.join(str(value) for value in signal_confirmation_bars_values)})"
     )
 
     run_index = 0
     for random_seed in random_seeds:
         for breakout_filter_enabled, breakout_strict_mode, breakout_mode_label in breakout_modes:
             for min_trend_strength_pct in min_trend_strength_values:
-                for short_window, long_window, stop_loss_pct, take_profit_pct in parameter_sets:
-                    run_index += 1
-                    config = SimulationConfig(
-                        execution_mode="paper",
-                        market_data_mode=args.market_data_mode,
-                        symbol=args.symbol,
-                        candle_count=args.candle_count,
-                        random_seed=random_seed,
-                        fee_rate=args.fee_rate,
-                        short_window=short_window,
-                        long_window=long_window,
-                        trend_filter_enabled=args.trend_filter_enabled,
-                        trend_window=args.trend_window,
-                        trend_slope_filter_enabled=args.trend_slope_filter_enabled,
-                        trend_slope_lookback=args.trend_slope_lookback,
-                        volatility_filter_enabled=args.volatility_filter_enabled,
-                        volatility_window=args.volatility_window,
-                        min_volatility_pct=args.min_volatility_pct,
-                        regime_filter_enabled=args.regime_filter_enabled,
-                        regime_window=args.regime_window,
-                        min_regime_volatility_pct=args.min_regime_volatility_pct,
-                        signal_confirmation_bars=args.signal_confirmation_bars,
-                        warmup_bars=args.warmup_bars,
-                        momentum_filter_enabled=args.momentum_filter_enabled,
-                        momentum_window=args.momentum_window,
-                        min_momentum_rsi=args.min_momentum_rsi,
-                        breakout_filter_enabled=breakout_filter_enabled,
-                        breakout_strict_mode=breakout_strict_mode,
-                        breakout_lookback=args.breakout_lookback,
-                        min_trend_strength_pct=min_trend_strength_pct,
-                        stop_loss_pct=stop_loss_pct,
-                        take_profit_pct=take_profit_pct,
-                        max_drawdown_limit_pct=args.max_drawdown_limit_pct,
-                        position_size_pct=args.position_size_pct,
-                    )
-                    result = run_simulation(config)
-                    print(
-                        f"[{run_index}/{total_runs}] "
-                        f"mode={breakout_mode_label} seed={random_seed} "
-                        f"short={short_window} long={long_window} "
-                        f"trend_strength={min_trend_strength_pct:.4f}% "
-                        f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} "
-                        f"return={result.return_pct:.2f}% final_balance={result.final_balance:.2f}"
-                    )
+                for signal_confirmation_bars in signal_confirmation_bars_values:
+                    for short_window, long_window, stop_loss_pct, take_profit_pct in parameter_sets:
+                        run_index += 1
+                        config = SimulationConfig(
+                            execution_mode="paper",
+                            market_data_mode=args.market_data_mode,
+                            symbol=args.symbol,
+                            candle_count=args.candle_count,
+                            random_seed=random_seed,
+                            fee_rate=args.fee_rate,
+                            short_window=short_window,
+                            long_window=long_window,
+                            trend_filter_enabled=args.trend_filter_enabled,
+                            trend_window=args.trend_window,
+                            trend_slope_filter_enabled=args.trend_slope_filter_enabled,
+                            trend_slope_lookback=args.trend_slope_lookback,
+                            volatility_filter_enabled=args.volatility_filter_enabled,
+                            volatility_window=args.volatility_window,
+                            min_volatility_pct=args.min_volatility_pct,
+                            regime_filter_enabled=args.regime_filter_enabled,
+                            regime_window=args.regime_window,
+                            min_regime_volatility_pct=args.min_regime_volatility_pct,
+                            signal_confirmation_bars=signal_confirmation_bars,
+                            warmup_bars=args.warmup_bars,
+                            momentum_filter_enabled=args.momentum_filter_enabled,
+                            momentum_window=args.momentum_window,
+                            min_momentum_rsi=args.min_momentum_rsi,
+                            breakout_filter_enabled=breakout_filter_enabled,
+                            breakout_strict_mode=breakout_strict_mode,
+                            breakout_lookback=args.breakout_lookback,
+                            min_trend_strength_pct=min_trend_strength_pct,
+                            stop_loss_pct=stop_loss_pct,
+                            take_profit_pct=take_profit_pct,
+                            max_drawdown_limit_pct=args.max_drawdown_limit_pct,
+                            position_size_pct=args.position_size_pct,
+                        )
+                        result = run_simulation(config)
+                        print(
+                            f"[{run_index}/{total_runs}] "
+                            f"mode={breakout_mode_label} seed={random_seed} "
+                            f"signal_bars={signal_confirmation_bars} "
+                            f"short={short_window} long={long_window} "
+                            f"trend_strength={min_trend_strength_pct:.4f}% "
+                            f"sl={stop_loss_pct:.4f} tp={take_profit_pct:.4f} "
+                            f"return={result.return_pct:.2f}% final_balance={result.final_balance:.2f}"
+                        )
 
     print(
         "Sweep finalizado. Las corridas quedaron agregadas en "
