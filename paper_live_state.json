@@ -1,8 +1,8 @@
 {
-  "cash": 5000.0,
-  "position_qty": 0.07059863191443647,
-  "entry_price": 70752.15,
-  "last_processed_timestamp": 1774296000000,
+  "cash": 9956.981712023786,
+  "position_qty": 0.0,
+  "entry_price": 0.0,
+  "last_processed_timestamp": 1774389600000,
   "equity_peak": 10046.469985697982,
   "kill_switch_active": false
 }

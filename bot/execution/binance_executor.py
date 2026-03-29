@@ -101,6 +101,7 @@ class BinanceExecutor:
             query_string.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
+
         body = f"{query_string}&signature={signature}".encode("utf-8")
         request = urllib.request.Request(
             url=f"{self.base_url}{path}",
@@ -118,9 +119,10 @@ class BinanceExecutor:
                     return {}
                 return json.loads(raw.decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            details = exc.read().decode("utf-8", errors="replace")
+            error_body = exc.read().decode("utf-8", errors="replace")
+
             raise BinanceExecutionError(
-                f"Binance API error ({exc.code}) on {path}: {details}"
+                f"Binance API error ({exc.code}) on {path}: {error_body}"
             ) from exc
         except urllib.error.URLError as exc:
             raise BinanceExecutionError(f"Network error calling Binance: {exc}") from exc
@@ -128,9 +130,14 @@ class BinanceExecutor:
     @staticmethod
     def _parse_quantity(value: str) -> Decimal:
         try:
-            return Decimal(str(value))
+            parsed = Decimal(str(value))
         except (InvalidOperation, ValueError) as exc:
             raise BinanceExecutionError(f"Invalid quantity: {value}") from exc
+
+        if parsed <= Decimal("0"):
+            raise BinanceExecutionError(f"Quantity must be greater than zero: {value}")
+
+        return parsed
 
     @staticmethod
     def _normalize_decimal(value: Decimal) -> str:
