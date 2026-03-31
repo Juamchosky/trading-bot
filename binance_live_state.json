@@ -1,8 +1,8 @@
 {
   "last_action": "hold",
   "last_position_known": 0.0,
-  "equity_peak": 0.0,
-  "kill_switch_active": true,
+  "equity_peak": 100.00497027,
+  "kill_switch_active": false,
   "last_entry_price": 0.0,
   "api_failure_count": 0
 }

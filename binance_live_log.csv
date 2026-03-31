@@ -143,3 +143,7 @@ Request ID: GxdIFDtObEy5mVpwOCMgBKruVq_54ImoblFU9dXLx9Oa4hEM55K24Q==
 2026-03-28T01:09:39.597858+00:00,BTCUSDT,dry-run,sell,hold,66305.92000000,0,0,0,0,error,error:[<class 'decimal.DivisionUndefined'>]
 2026-03-28T22:23:26.912136+00:00,BTCUSDT,dry-run,hold,hold,66769.44000000,0,0,0,0,error,error:[<class 'decimal.DivisionUndefined'>]
 2026-03-28T22:56:04.485240+00:00,BTCUSDT,dry-run,hold,hold,66745.25000000,0,0,0,0,kill_switch,kill_switch_active
+2026-03-30T23:33:56.586827+00:00,BTCUSDT,dry-run,hold,hold,0.00000000,0,0,0,0,error,error:Missing BINANCE_API_KEY or BINANCE_API_SECRET environment variables.
+2026-03-30T23:34:45.052272+00:00,BTCUSDT,dry-run,sell,hold,66750.57000000,0,100.00497027,0,100.00497027,kill_switch,kill_switch_active
+2026-03-30T23:44:39.583722+00:00,BTCUSDT,dry-run,sell,hold,66759.49000000,0,100.00497027,0,100.00497027,blocked,no_position_to_sell
+2026-03-30T23:52:56.087769+00:00,BTCUSDT,live,sell,hold,66758.80000000,0,100.00497027,0,100.00497027,blocked,no_position_to_sell
