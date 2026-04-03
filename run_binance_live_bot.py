@@ -20,6 +20,9 @@ from bot.strategy.sma_cross import SMACrossStrategy
 
 LOG_PATH = Path("binance_live_log.csv")
 STATE_PATH = Path("binance_live_state.json")
+PROFILE_CURRENT = "current"
+PROFILE_ACTIVE = "active"
+PROFILE_LIVE_SIMPLE = "live_simple"
 
 
 class BinanceLiveRunnerError(RuntimeError):
@@ -46,6 +49,20 @@ class CandidateConfig:
     binance_interval: str = "1h"
     candle_count: int = 300
     base_url: str = "https://api.binance.com"
+
+
+STRATEGY_PROFILES: dict[str, CandidateConfig] = {
+    PROFILE_CURRENT: CandidateConfig(),
+    PROFILE_ACTIVE: CandidateConfig(
+        signal_confirmation_bars=0,
+        trend_slope_filter_enabled=False,
+    ),
+    PROFILE_LIVE_SIMPLE: CandidateConfig(
+        signal_confirmation_bars=0,
+        trend_filter_enabled=False,
+        trend_slope_filter_enabled=False,
+    ),
+}
 
 
 @dataclass
@@ -340,7 +357,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable-state", action="store_true")
     parser.add_argument("--live", action="store_true", help="Habilita ordenes reales.")
     parser.add_argument("--dry-run", action="store_true", help="Fuerza modo dry-run.")
+    parser.add_argument(
+        "--strategy-profile",
+        choices=sorted(STRATEGY_PROFILES),
+        default=PROFILE_CURRENT,
+        help=(
+            "Perfil de estrategia a usar: current mantiene la configuracion actual, "
+            "active relaja confirmacion/pendiente, live_simple desactiva filtros de tendencia."
+        ),
+    )
     return parser.parse_args()
+
+
+def resolve_candidate_config(args: argparse.Namespace) -> CandidateConfig:
+    profile_config = STRATEGY_PROFILES[args.strategy_profile]
+    return CandidateConfig(
+        **{
+            **asdict(profile_config),
+            "symbol": args.symbol.upper(),
+            "binance_interval": args.interval,
+            "candle_count": args.candle_count,
+            "base_url": args.base_url,
+        }
+    )
 
 
 def load_state(path: Path) -> LiveState:
@@ -387,6 +426,7 @@ def append_log_row(
     path: Path,
     *,
     symbol: str,
+    strategy_profile: str,
     mode: str,
     signal: str,
     action_taken: str,
@@ -401,6 +441,7 @@ def append_log_row(
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "symbol": symbol,
+        "strategy_profile": strategy_profile,
         "mode": mode,
         "signal": signal,
         "action_taken": action_taken,
@@ -419,6 +460,7 @@ def append_log_row(
             fieldnames=[
                 "timestamp",
                 "symbol",
+                "strategy_profile",
                 "mode",
                 "signal",
                 "action_taken",
@@ -464,12 +506,8 @@ def main() -> None:
     if args.max_usd_notional <= 0:
         raise BinanceLiveRunnerError("--max-usd-notional must be greater than zero.")
 
-    config = CandidateConfig(
-        symbol=args.symbol.upper(),
-        binance_interval=args.interval,
-        candle_count=args.candle_count,
-        base_url=args.base_url,
-    )
+    config = resolve_candidate_config(args)
+    strategy_profile = args.strategy_profile
     strategy = build_strategy(config)
     state = load_state(args.state_path) if not args.disable_state else LiveState(
         last_action="none",
@@ -677,6 +715,7 @@ def main() -> None:
         append_log_row(
             args.log_path,
             symbol=config.symbol,
+            strategy_profile=strategy_profile,
             mode=mode_label,
             signal=signal,
             action_taken=action_taken,
@@ -693,6 +732,7 @@ def main() -> None:
             save_state(args.state_path, state)
 
         print(f"symbol: {config.symbol}")
+        print(f"strategy_profile: {strategy_profile}")
         print(f"mode: {mode_label}")
         print(f"signal: {signal}")
         print(f"action_taken: {action_taken}")
@@ -713,6 +753,7 @@ def main() -> None:
             append_log_row(
                 args.log_path,
                 symbol=config.symbol,
+                strategy_profile=strategy_profile,
                 mode=mode_label,
                 signal=signal,
                 action_taken="hold",

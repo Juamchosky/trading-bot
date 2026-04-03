@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_SCHEDULER_LOG_PATH = Path("paper_live_scheduler_log.csv")
+STRATEGY_PROFILE_CHOICES = ("current", "active", "live_simple")
 
 
 def utc_now_iso() -> str:
@@ -39,6 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fee-rate", type=float)
     parser.add_argument("--log-path", type=Path)
     parser.add_argument("--state-path", type=Path)
+    parser.add_argument("--strategy-profile", choices=STRATEGY_PROFILE_CHOICES)
     parser.add_argument(
         "--disable-state",
         action="store_true",
@@ -116,6 +118,7 @@ def build_run_command(args: argparse.Namespace) -> list[str]:
         "--fee-rate": args.fee_rate,
         "--log-path": args.log_path,
         "--state-path": args.state_path,
+        "--strategy-profile": args.strategy_profile,
     }
 
     for key, value in passthrough_args.items():

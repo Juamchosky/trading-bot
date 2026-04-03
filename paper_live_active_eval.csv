@@ -1,0 +1,2 @@
+timestamp,symbol,strategy_profile,signal,action_taken,price,position_qty,cash,equity,notes
+2026-04-01T19:46:13.038255+00:00,BTCUSDT,active,buy,hold,68231.05000000,0.00000000,9929.55638435,9929.55638435,drawdown_kill_switch

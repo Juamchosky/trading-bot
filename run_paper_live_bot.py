@@ -13,6 +13,9 @@ from bot.strategy.sma_cross import SMACrossStrategy
 
 LOG_PATH = Path("paper_live_log.csv")
 STATE_PATH = Path("paper_live_state.json")
+PROFILE_CURRENT = "current"
+PROFILE_ACTIVE = "active"
+PROFILE_LIVE_SIMPLE = "live_simple"
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,20 @@ class CandidateConfig:
     candle_count: int = 300
     fee_rate: float = 0.001
     initial_cash: float = 10_000.0
+
+
+STRATEGY_PROFILES: dict[str, CandidateConfig] = {
+    PROFILE_CURRENT: CandidateConfig(),
+    PROFILE_ACTIVE: CandidateConfig(
+        signal_confirmation_bars=0,
+        trend_slope_filter_enabled=False,
+    ),
+    PROFILE_LIVE_SIMPLE: CandidateConfig(
+        signal_confirmation_bars=0,
+        trend_filter_enabled=False,
+        trend_slope_filter_enabled=False,
+    ),
+}
 
 
 @dataclass
@@ -66,11 +83,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-path", type=Path, default=LOG_PATH)
     parser.add_argument("--state-path", type=Path, default=STATE_PATH)
     parser.add_argument(
+        "--strategy-profile",
+        choices=sorted(STRATEGY_PROFILES),
+        default=PROFILE_CURRENT,
+        help=(
+            "Perfil de estrategia a usar: current mantiene la configuracion actual, "
+            "active relaja confirmacion/pendiente, live_simple desactiva filtros de tendencia."
+        ),
+    )
+    parser.add_argument(
         "--disable-state",
         action="store_true",
         help="Si se pasa, no lee/escribe estado JSON persistente.",
     )
     return parser.parse_args()
+
+
+def resolve_candidate_config(args: argparse.Namespace) -> CandidateConfig:
+    profile_config = STRATEGY_PROFILES[args.strategy_profile]
+    return CandidateConfig(
+        **{
+            **asdict(profile_config),
+            "symbol": args.symbol.upper(),
+            "binance_interval": args.interval,
+            "candle_count": args.candle_count,
+            "fee_rate": args.fee_rate,
+            "initial_cash": args.initial_cash,
+        }
+    )
 
 
 def load_state(path: Path, *, initial_cash: float) -> PaperLiveState:
@@ -111,6 +151,7 @@ def append_log_row(
     path: Path,
     *,
     symbol: str,
+    strategy_profile: str,
     signal: str,
     action_taken: str,
     price: float,
@@ -122,6 +163,7 @@ def append_log_row(
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "symbol": symbol,
+        "strategy_profile": strategy_profile,
         "signal": signal,
         "action_taken": action_taken,
         "price": f"{price:.8f}",
@@ -137,6 +179,7 @@ def append_log_row(
             fieldnames=[
                 "timestamp",
                 "symbol",
+                "strategy_profile",
                 "signal",
                 "action_taken",
                 "price",
@@ -168,13 +211,8 @@ def build_strategy(config: CandidateConfig) -> SMACrossStrategy:
 
 def main() -> None:
     args = parse_args()
-    config = CandidateConfig(
-        symbol=args.symbol,
-        binance_interval=args.interval,
-        candle_count=args.candle_count,
-        fee_rate=args.fee_rate,
-        initial_cash=args.initial_cash,
-    )
+    config = resolve_candidate_config(args)
+    strategy_profile = args.strategy_profile
 
     if config.market_data_mode != "binance_historical":
         raise ValueError("Este runner esta fijado a market_data_mode='binance_historical'.")
@@ -286,6 +324,7 @@ def main() -> None:
     append_log_row(
         args.log_path,
         symbol=config.symbol,
+        strategy_profile=strategy_profile,
         signal=current_signal,
         action_taken=action_taken,
         price=latest_price,
@@ -310,6 +349,7 @@ def main() -> None:
 
     position_state = "in_position" if broker.position_qty > 0 else "flat"
     print(f"symbol: {config.symbol}")
+    print(f"strategy_profile: {strategy_profile}")
     print(f"current_price: {latest_price:.2f}")
     print(f"current_signal: {current_signal}")
     print(f"position_state: {position_state}")
