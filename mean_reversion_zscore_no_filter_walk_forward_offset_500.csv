@@ -1,0 +1,6 @@
+row_type,split_name,train_start_index,train_end_index,test_start_index,test_end_index,train_return_pct,test_return_pct,train_max_drawdown_pct,test_max_drawdown_pct,train_closed_trades,test_closed_trades,avg_train_return_pct,avg_test_return_pct,std_test_return_pct,positive_test_rate,worst_test_return_pct
+split,split_1,0,599,600,899,-0.381654,-0.700695,1.775688,3.501011,4,3,,,,,
+split,split_2,300,899,900,1199,-1.281708,2.065847,3.748064,0.400482,6,3,,,,,
+split,split_3,600,1199,1200,1499,1.350676,3.456220,3.501011,0.277502,6,3,,,,,
+split,split_4,900,1499,1500,1799,5.593467,-0.886113,0.400482,1.339817,6,2,,,,,
+aggregate,aggregate,,,,,,,,,,,1.320195,0.983815,1.845114,0.500000,-0.886113

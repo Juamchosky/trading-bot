@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,window,entry_zscore,exit_zscore,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,exposure_pct,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor,avg_trade_return_pct
+mean_reversion_zscore_sma20_std20_entry-2_exit0_long_flat,BTCUSDT,1h,1000,0,20,-2.000000,0.000000,15,15,970,15,15,31.300000,9203.024247,-7.969758,9.267950,15,53.333333,0.351142,-0.888006

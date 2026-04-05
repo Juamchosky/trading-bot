@@ -1,0 +1,6 @@
+row_type,historical_offset,return_pct,max_drawdown_pct,profit_factor,avg_return_pct,std_return_pct,worst_return_pct,best_return_pct,avg_drawdown,worst_drawdown,robustness_score
+offset,0,-10.340772,10.340772,0.185861,,,,,,,
+offset,500,-5.781991,10.670122,0.487163,,,,,,,
+offset,1000,-7.856232,8.871111,0.349178,,,,,,,
+offset,1500,-6.602661,8.069188,0.460129,,,,,,,
+aggregate,aggregate,,,,-7.645414,1.722576,-10.340772,-5.781991,9.487798,10.670122,-20.038112

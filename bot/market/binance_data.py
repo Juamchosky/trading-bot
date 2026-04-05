@@ -6,6 +6,9 @@ import urllib.request
 from bot.models import Candle
 
 
+_MAX_KLINE_BATCH_LIMIT = 1000
+
+
 class BinanceMarketDataError(RuntimeError):
     pass
 
@@ -24,35 +27,41 @@ def fetch_historical_candles(
         raise BinanceMarketDataError("historical_offset must be zero or greater.")
 
     requested_limit = limit + historical_offset
+    raw_batches: list[list[object]] = []
+    oldest_open_time: int | None = None
 
-    params = urllib.parse.urlencode(
-        {
-            "symbol": symbol.upper(),
-            "interval": interval,
-            "limit": str(requested_limit),
-        }
-    )
-    url = f"{base_url.rstrip('/')}/api/v3/klines?{params}"
-    request = urllib.request.Request(url=url, method="GET")
+    while len(raw_batches) < requested_limit:
+        batch_limit = min(_MAX_KLINE_BATCH_LIMIT, requested_limit - len(raw_batches))
+        payload = _fetch_kline_batch(
+            symbol=symbol,
+            interval=interval,
+            limit=batch_limit,
+            end_time=oldest_open_time - 1 if oldest_open_time is not None else None,
+            base_url=base_url,
+        )
+        if not payload:
+            break
 
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        details = exc.read().decode("utf-8", errors="replace")
-        raise BinanceMarketDataError(
-            f"Binance market data error ({exc.code}): {details}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise BinanceMarketDataError(f"Network error calling Binance: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise BinanceMarketDataError("Invalid JSON response from Binance.") from exc
+        if oldest_open_time is not None:
+            payload = [
+                entry
+                for entry in payload
+                if _extract_open_time(entry) < oldest_open_time
+            ]
+        if not payload:
+            break
 
-    if not isinstance(payload, list) or not payload:
+        raw_batches = payload + raw_batches
+        oldest_open_time = _extract_open_time(payload[0])
+
+        if len(payload) < batch_limit:
+            break
+
+    if not raw_batches:
         raise BinanceMarketDataError("Binance returned no kline data.")
 
     candles: list[Candle] = []
-    for index, entry in enumerate(payload):
+    for index, entry in enumerate(raw_batches[-requested_limit:]):
         try:
             timestamp = int(entry[0])
             open_price = float(entry[1])
@@ -94,3 +103,48 @@ def fetch_historical_candles(
         )
         for index, candle in enumerate(selected)
     ]
+
+
+def _fetch_kline_batch(
+    *,
+    symbol: str,
+    interval: str,
+    limit: int,
+    end_time: int | None,
+    base_url: str,
+) -> list[list[object]]:
+    params = {
+        "symbol": symbol.upper(),
+        "interval": interval,
+        "limit": str(limit),
+    }
+    if end_time is not None:
+        params["endTime"] = str(end_time)
+
+    url = f"{base_url.rstrip('/')}/api/v3/klines?{urllib.parse.urlencode(params)}"
+    request = urllib.request.Request(url=url, method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise BinanceMarketDataError(
+            f"Binance market data error ({exc.code}): {details}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise BinanceMarketDataError(f"Network error calling Binance: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise BinanceMarketDataError("Invalid JSON response from Binance.") from exc
+
+    if not isinstance(payload, list):
+        raise BinanceMarketDataError("Unexpected kline payload from Binance.")
+
+    return payload
+
+
+def _extract_open_time(entry: object) -> int:
+    try:
+        return int(entry[0])  # type: ignore[index]
+    except (IndexError, TypeError, ValueError) as exc:
+        raise BinanceMarketDataError("Unexpected kline format from Binance.") from exc

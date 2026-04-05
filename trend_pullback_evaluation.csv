@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor
+trend_pullback_ema20_touch_sma50_atr14_prior_return_impulse,BTCUSDT,1h,2000,0,8,33,1959,8,8,9969.269929,-0.307301,2.781863,8,37.500000,0.897515

@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor
+compression_breakout_box20_range3_tp2r,BTCUSDT,1h,1000,0,4,0,996,4,4,9386.729201,-6.132708,8.732952,4,0.000000,0.000000

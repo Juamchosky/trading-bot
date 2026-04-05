@@ -382,25 +382,32 @@ def resolve_candidate_config(args: argparse.Namespace) -> CandidateConfig:
     )
 
 
-def load_state(path: Path) -> LiveState:
-    if not path.exists():
-        return LiveState(
-            last_action="none",
-            last_position_known=0.0,
-            equity_peak=0.0,
-            kill_switch_active=False,
-            last_entry_price=0.0,
-            api_failure_count=0,
-        )
-    payload = json.loads(path.read_text(encoding="utf-8"))
+def build_default_state() -> LiveState:
     return LiveState(
-        last_action=str(payload.get("last_action", "none")),
-        last_position_known=float(payload.get("last_position_known", 0.0)),
-        equity_peak=float(payload.get("equity_peak", 0.0)),
-        kill_switch_active=bool(payload.get("kill_switch_active", False)),
-        last_entry_price=float(payload.get("last_entry_price", 0.0)),
-        api_failure_count=int(payload.get("api_failure_count", 0)),
+        last_action="none",
+        last_position_known=0.0,
+        equity_peak=0.0,
+        kill_switch_active=False,
+        last_entry_price=0.0,
+        api_failure_count=0,
     )
+
+
+def load_state(path: Path) -> tuple[LiveState, bool]:
+    if not path.exists():
+        return build_default_state(), True
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return LiveState(
+            last_action=str(payload.get("last_action", "none")),
+            last_position_known=float(payload.get("last_position_known", 0.0)),
+            equity_peak=float(payload.get("equity_peak", 0.0)),
+            kill_switch_active=bool(payload.get("kill_switch_active", False)),
+            last_entry_price=float(payload.get("last_entry_price", 0.0)),
+            api_failure_count=int(payload.get("api_failure_count", 0)),
+        ), False
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return build_default_state(), True
 
 
 def save_state(path: Path, state: LiveState) -> None:
@@ -497,6 +504,53 @@ def safe_call(state: LiveState, max_failures: int, fn, *args, **kwargs):
         raise
 
 
+def reconcile_state_with_account(
+    *,
+    state: LiveState,
+    state_recovered: bool,
+    account: AccountSnapshot,
+    reference_price: Decimal,
+    min_position_qty: Decimal,
+    symbol_min_qty: Decimal,
+) -> tuple[bool, Decimal, list[str]]:
+    notes: list[str] = []
+    position_threshold = max(min_position_qty, symbol_min_qty)
+
+    if state.last_position_known < 0:
+        state.last_position_known = 0.0
+        state.last_entry_price = 0.0
+        state.equity_peak = 0.0
+        state_recovered = True
+        notes.append("state_reconciliation_failed")
+
+    in_position = account.base_total >= position_threshold
+    last_known_position = Decimal(str(state.last_position_known))
+    state_position_open = last_known_position >= position_threshold
+    position_qty_mismatch = abs(account.base_total - last_known_position) >= position_threshold
+    equity_estimated = account.quote_total + (account.base_total * reference_price)
+    reanchor_equity_peak = (
+        state_recovered
+        or state.equity_peak <= 0
+        or state_position_open != in_position
+        or position_qty_mismatch
+        or (in_position and state.last_entry_price <= 0)
+    )
+
+    if in_position and (not state_position_open or state.last_entry_price <= 0):
+        state.last_entry_price = float(reference_price)
+        notes.append("reconciled_existing_spot_position")
+    elif not in_position and state_position_open:
+        state.last_entry_price = 0.0
+        notes.append("reconciled_flat_spot_position")
+
+    if reanchor_equity_peak:
+        state.equity_peak = float(equity_estimated)
+        notes.append("equity_peak_reanchored")
+
+    state.last_position_known = float(account.base_total)
+    return in_position, equity_estimated, notes
+
+
 def main() -> None:
     args = parse_args()
     live_mode = bool(args.live and not args.dry_run)
@@ -509,13 +563,10 @@ def main() -> None:
     config = resolve_candidate_config(args)
     strategy_profile = args.strategy_profile
     strategy = build_strategy(config)
-    state = load_state(args.state_path) if not args.disable_state else LiveState(
-        last_action="none",
-        last_position_known=0.0,
-        equity_peak=0.0,
-        kill_switch_active=False,
-        last_entry_price=0.0,
-        api_failure_count=0,
+    state, state_recovered = (
+        load_state(args.state_path)
+        if not args.disable_state
+        else (build_default_state(), True)
     )
 
     signal = "hold"
@@ -527,6 +578,8 @@ def main() -> None:
     final_position = Decimal("0")
     final_cash = Decimal("0")
     final_equity = Decimal("0")
+    stop_loss_hit = False
+    take_profit_hit = False
 
     try:
         client = BinanceSpotClient(base_url=config.base_url)
@@ -559,33 +612,38 @@ def main() -> None:
             quote_asset=symbol_rules.quote_asset,
         )
 
-        min_position_qty = Decimal(str(args.min_position_qty))
-        in_position = account.base_total > min_position_qty
-        if state.last_position_known < 0:
-            state.kill_switch_active = True
-            notes.append("state_reconciliation_failed")
-            status = "kill_switch"
-
         cash_estimated = account.quote_total
-        equity_estimated = cash_estimated + (account.base_total * reference_price)
-        
+        min_position_qty = Decimal(str(args.min_position_qty))
+        (
+            in_position,
+            equity_estimated,
+            reconciliation_notes,
+        ) = reconcile_state_with_account(
+            state=state,
+            state_recovered=state_recovered,
+            account=account,
+            reference_price=reference_price,
+            min_position_qty=min_position_qty,
+            symbol_min_qty=symbol_rules.min_qty,
+        )
+        notes.extend(reconciliation_notes)
+
         peak = Decimal(str(state.equity_peak))
-        if state.equity_peak <= Decimal ("0"):
+        if peak <= Decimal("0"):
             state.equity_peak = float(equity_estimated)
-            peak = Decimal (str(state.equity_peak))
+            peak = Decimal(str(state.equity_peak))
+            if "equity_peak_reanchored" not in notes:
+                notes.append("equity_peak_reanchored")
 
         if equity_estimated > peak:
             state.equity_peak = float(equity_estimated)
         else:
-            if peak > Decimal("0"):
-                drawdown = ((peak - equity_estimated) / peak) * Decimal ("100")
+            if peak > Decimal("0") and equity_estimated >= Decimal("0"):
+                drawdown = ((peak - equity_estimated) / peak) * Decimal("100")
                 if drawdown >= Decimal(str(config.max_drawdown_limit_pct)):
                     state.kill_switch_active = True
                     status = "kill_switch"
                     notes.append("drawdown_kill_switch")
-                    
-            stop_loss_hit = False
-            take_profit_hit = False
         if in_position and state.last_entry_price > 0:
             entry = Decimal(str(state.last_entry_price))
             stop_level = entry * (Decimal("1") - Decimal(str(config.stop_loss_pct)))

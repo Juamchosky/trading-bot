@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor
+trend_breakout_strength_sma50_slope10_high10_body05_tp2r,BTCUSDT,1h,1000,0,7,0,993,7,7,9686.573807,-3.134262,5.172947,7,28.571429,0.629626

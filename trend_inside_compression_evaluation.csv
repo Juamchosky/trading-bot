@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor
+trend_inside_compression_sma50_slope10_tp2r,BTCUSDT,1h,2000,1500,20,0,1980,20,20,9770.134107,-2.298659,3.416351,20,35.000000,0.595325

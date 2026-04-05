@@ -1,0 +1,5 @@
+strategy_profile,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor,ranking_score
+current,6,130,164,4,4,9893.133685,-1.068663,1.740447,4,0.000000,0.000000,0.063682
+active,76,130,94,6,6,9807.150685,-1.928493,1.928493,6,0.000000,0.000000,0.236568
+live_simple,142,139,19,4,4,9913.908034,-0.860920,1.748322,4,25.000000,0.017311,0.320096
+balanced,109,136,55,3,3,9915.371781,-0.846282,1.748322,3,33.333333,0.017608,0.191042

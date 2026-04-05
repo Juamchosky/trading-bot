@@ -1,0 +1,2 @@
+strategy_name,symbol,interval,candle_count,historical_offset,total_signals_buy,total_signals_sell,total_signals_hold,total_buys_executed,total_sells_executed,exposure_pct,final_equity,return_pct,max_drawdown_pct,closed_trades,win_rate_pct,profit_factor,avg_trade_return_pct
+time_series_momentum_multi_l50_l100_l200_vote2_regime_abs_r200_3pct,BTCUSDT,1h,1000,0,10,10,980,10,10,48.500000,9929.448817,-0.705512,5.483332,10,40.000000,0.682499,0.060714
